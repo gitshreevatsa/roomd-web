@@ -1,0 +1,64 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { getServerIdentity } from "@/lib/session";
+import { getRoomSummaries } from "@/lib/rooms";
+import { Button } from "@/components/ui/button";
+import { RoomCard } from "@/components/RoomCard";
+import { Plus } from "lucide-react";
+
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  const identity = await getServerIdentity();
+  if (!identity) redirect("/login");
+
+  const rooms = await getRoomSummaries(identity.userId, identity.apiKey);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {rooms.length} room{rooms.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <Link href="/rooms/new">
+          <Button>
+            <Plus className="h-4 w-4" />
+            New room
+          </Button>
+        </Link>
+      </div>
+
+      {rooms.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center space-y-4">
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Create your first room</h2>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Rooms are namespaced workspaces for a project. Each room has its own agents,
+              tasks, events, and context.
+            </p>
+          </div>
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>✦ Agents coordinate in real time via MCP tools</p>
+            <p>✦ Watch tasks, events, and context from here</p>
+            <p>✦ Invite collaborators with room-scoped tokens</p>
+          </div>
+          <Link href="/rooms/new">
+            <Button size="lg">
+              <Plus className="h-4 w-4" />
+              Create your first room
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rooms.map((room) => (
+            <RoomCard key={room.roomId} room={room} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

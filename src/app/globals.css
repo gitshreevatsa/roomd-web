@@ -2,26 +2,180 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+/*
+ * Terminal green — senior take:
+ * Sans for reading and UI. Mono only for code, ids, live feeds.
+ * Green is the signal (live, primary CTA), not wallpaper.
+ * Space and hierarchy first; terminal cues are accents, not costume.
+ */
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 140 8% 98%;
+    --foreground: 150 18% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 18% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 18% 12%;
+    --primary: 142 68% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 140 6% 94%;
+    --secondary-foreground: 150 14% 20%;
+    --muted: 140 6% 95%;
+    --muted-foreground: 150 6% 42%;
+    --accent: 142 28% 94%;
+    --accent-foreground: 142 60% 24%;
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 140 8% 88%;
+    --input: 140 8% 88%;
+    --ring: 142 68% 32%;
+    --radius: 0.5rem;
+    --glow: 142 68% 32%;
+  }
+
+  .dark {
+    --background: 150 10% 5%;
+    --foreground: 140 12% 94%;
+    --card: 150 8% 7%;
+    --card-foreground: 140 12% 94%;
+    --popover: 150 8% 7%;
+    --popover-foreground: 140 12% 94%;
+    --primary: 142 78% 48%;
+    --primary-foreground: 150 30% 5%;
+    --secondary: 150 6% 13%;
+    --secondary-foreground: 140 10% 92%;
+    --muted: 150 6% 12%;
+    --muted-foreground: 140 6% 58%;
+    --accent: 142 20% 14%;
+    --accent-foreground: 142 78% 58%;
+    --destructive: 0 62% 48%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 150 6% 16%;
+    --input: 150 6% 16%;
+    --ring: 142 78% 48%;
+    --glow: 142 78% 48%;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-geist-sans), system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+  code,
+  kbd,
+  pre,
+  .font-mono {
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Soft atmosphere — not a hard grid. */
+  .roomd-glow {
+    background: radial-gradient(
+      ellipse 70% 55% at 70% 0%,
+      hsl(var(--glow) / 0.14),
+      transparent 60%
+    );
+  }
+
+  .roomd-glow-strong {
+    background: radial-gradient(
+      ellipse 55% 45% at 50% 0%,
+      hsl(var(--glow) / 0.22),
+      transparent 65%
+    );
+  }
+}
+
+@keyframes roomd-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes roomd-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes roomd-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+@keyframes roomd-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes roomd-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.roomd-enter {
+  animation: roomd-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.roomd-rise {
+  animation: roomd-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.roomd-live {
+  animation: roomd-glow-pulse 1.8s ease-in-out infinite;
+}
+.roomd-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--primary) / 0.12),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: roomd-shimmer 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roomd-enter,
+  .roomd-rise,
+  .roomd-live,
+  .roomd-shimmer {
+    animation: none !important;
   }
 }
