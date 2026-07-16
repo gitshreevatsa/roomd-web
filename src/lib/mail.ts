@@ -1,4 +1,5 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import { buildInviteEmailHtml } from "@/lib/email/invite-template";
 
 /**
  * Outbound email via SMTP (nodemailer).
@@ -98,11 +99,7 @@ export async function sendInviteEmail(args: {
     `Sign in at ${loginUrl} with this key:\n\n${key}\n\n` +
     `${scope} Keep the key somewhere safe.`;
 
-  const html =
-    `<p>${escapeHtml(who)} to <strong>roomd</strong>.</p>` +
-    `<p>Sign in at <a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a> with this key:</p>` +
-    `<pre style="padding:12px;background:#f4f4f5;border-radius:6px;font-family:monospace">${escapeHtml(key)}</pre>` +
-    `<p>${escapeHtml(scope)} Keep the key somewhere safe.</p>`;
+  const html = buildInviteEmailHtml({ key, loginUrl, who, scope });
 
   return sendMail({ to, subject: "Your roomd invite", text, html });
 }

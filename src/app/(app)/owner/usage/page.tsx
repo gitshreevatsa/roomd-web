@@ -1,10 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getServerIdentity, isOperator } from "@/lib/session";
 import { buildUsageReport } from "@/lib/usage";
 import { formatRelativeTime, formatDate } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { OwnerNav } from "@/components/owner/OwnerNav";
 
 export const dynamic = "force-dynamic";
 
@@ -30,21 +28,15 @@ export default async function UsagePage() {
   const o = report.overview;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Usage</h1>
-          <p className="text-sm text-muted-foreground">
-            Every org, room, and how much each is being used. Operator view.
-          </p>
-        </div>
-        <Link href="/owner">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <ArrowLeft className="h-4 w-4" />
-            Owner
-          </Button>
-        </Link>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Owner</h1>
+        <p className="text-sm text-muted-foreground">
+          Every org, room, and how much each is being used. Operator view.
+        </p>
       </div>
+
+      <OwnerNav />
 
       {/* Overview */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
