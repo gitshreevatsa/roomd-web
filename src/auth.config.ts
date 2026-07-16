@@ -47,5 +47,29 @@ export const authConfig = {
       }
       return session;
     },
+    // Allow sign-out to land on the marketing host (roomd.sh), not only app.roomd.sh.
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      try {
+        const target = new URL(url);
+        const allowed = new Set([
+          new URL(baseUrl).origin,
+          "https://roomd.sh",
+          "https://www.roomd.sh",
+        ]);
+        const marketing = process.env.MARKETING_URL;
+        if (marketing) {
+          try {
+            allowed.add(new URL(marketing).origin);
+          } catch {
+            /* ignore bad MARKETING_URL */
+          }
+        }
+        if (allowed.has(target.origin)) return url;
+      } catch {
+        /* fall through */
+      }
+      return baseUrl;
+    },
   },
 } satisfies NextAuthConfig;

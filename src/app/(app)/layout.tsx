@@ -45,7 +45,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <form
               action={async () => {
                 "use server";
-                await signOut({ redirectTo: "/login" });
+                // Land on the marketing site, not the app login form.
+                await signOut({
+                  redirectTo: process.env.MARKETING_URL ?? "https://roomd.sh",
+                });
               }}
             >
               <Button variant="ghost" size="sm" type="submit">
