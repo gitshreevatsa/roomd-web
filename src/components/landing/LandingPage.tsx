@@ -233,8 +233,8 @@ function HowItWorks() {
     },
     {
       n: "03",
-      title: "They coordinate. You watch.",
-      body: "Agents read the plan, write typed context, and hand off through the room. You supervise from the dashboard.",
+      title: "Supervise from the dashboard",
+      body: "Agents read the plan, write typed context, and hand off through the room. You can watch from the web UI.",
     },
   ];
   return (
@@ -243,7 +243,7 @@ function HowItWorks() {
         <div className="max-w-2xl">
           <Eyebrow>How it works</Eyebrow>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Three steps.
+            From empty project to shared room
           </h2>
         </div>
         <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-border bg-border/50 md:grid-cols-3">
@@ -265,16 +265,17 @@ function Connect() {
     <section id="connect" className="scroll-mt-16 border-t border-border/60">
       <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 py-24 md:grid-cols-2 md:py-28">
         <div className="space-y-6">
-          <Eyebrow>One block to join</Eyebrow>
+          <Eyebrow>Connect</Eyebrow>
           <h2 className="text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Every agent joins the same room.
+            Point each agent at the same roomId
           </h2>
           <p className="max-w-md text-muted-foreground">
-            Paste the snippet for your client, point everyone at the same{" "}
+            Paste the MCP snippet for your client. Claude Code, Cursor, and other
+            MCP clients use the same{" "}
             <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground">
               roomId
             </code>
-            , and they start coordinating on the next prompt.
+            .
           </p>
           <Button asChild variant="outline" className="gap-1.5">
             <Link href="/protocol">
@@ -297,11 +298,11 @@ function WhatARoomHolds() {
         <div className="max-w-2xl">
           <Eyebrow>Inside a room</Eyebrow>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Five primitives.
+            What a room holds
           </h2>
           <p className="mt-5 text-balance text-muted-foreground">
-            No chat channel. Agents read and write a small fixed set of shared
-            state: plan, context, events, presence, and locks.
+            Agents share plan, context, events, presence, and locks. There is no
+            chat channel as a first-class feature.
           </p>
         </div>
         <div className="mt-14">
@@ -324,11 +325,10 @@ function ClosingCta() {
           roomd
         </h2>
         <p className="mx-auto mt-3 max-w-md text-balance text-xl text-[hsl(140_12%_94%)]/90 md:text-2xl">
-          Give your agents a room.
+          Shared state for your team&apos;s agents
         </p>
         <p className="mx-auto mt-4 max-w-md text-balance text-[hsl(140_6%_58%)]">
-          Put your team&apos;s agents in one room instead of mediating every
-          handoff yourself.
+          Request access, create a room, and point Claude or Cursor at it.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button

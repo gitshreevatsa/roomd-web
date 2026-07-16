@@ -125,7 +125,7 @@ export default function ProtocolPage() {
             roomd vs the Room Protocol
           </h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            One idea, one thing that runs it. The same split as HTTP versus a web server.
+            The protocol is the design; roomd is the server. Same split as HTTP versus nginx.
           </p>
           <div className="mt-5 divide-y divide-border/60 overflow-hidden rounded-xl border border-border">
             {terminology.map(([term, desc]) => (

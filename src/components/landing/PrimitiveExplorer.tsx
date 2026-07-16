@@ -57,7 +57,7 @@ const PRIMITIVES: Primitive[] = [
   {
     id: "locks",
     name: "Locks",
-    tagline: "no clashes",
+    tagline: "exclusive claim",
     body: "A named lock so two agents don't read-modify-write the same resource at once.",
     sample: `acquire_lock({ roomId, resource: "plan" })
 → { acquired: true }`,

@@ -37,7 +37,7 @@ export default function WaitlistPage() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">roomd</h1>
-          <p className="text-sm text-muted-foreground">One shared room for your team&apos;s agents</p>
+          <p className="text-sm text-muted-foreground">Shared rooms for AI coding agents</p>
         </div>
 
         {submitted ? (

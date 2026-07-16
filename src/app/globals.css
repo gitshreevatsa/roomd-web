@@ -3,10 +3,8 @@
 @tailwind utilities;
 
 /*
- * Terminal green — senior take:
- * Sans for reading and UI. Mono only for code, ids, live feeds.
- * Green is the signal (live, primary CTA), not wallpaper.
- * Space and hierarchy first; terminal cues are accents, not costume.
+ * Theme: phosphor green accent.
+ * Sans for UI; mono for code, ids, and live feeds only.
  */
 @layer base {
   :root {
