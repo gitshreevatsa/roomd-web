@@ -68,6 +68,8 @@ export interface UserRecord {
   apiKey: string;
   authMethods: ("apikey" | "email" | "google" | "github")[];
   createdAt: string;
+  /** Operator disabled the account; dashboard login blocked until cleared. */
+  disabledAt?: string;
 }
 
 export interface RoomMeta {

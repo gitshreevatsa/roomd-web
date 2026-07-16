@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const LINKS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/owner", label: "Invite", exact: true },
   { href: "/owner/waitlist", label: "Waitlist" },
+  { href: "/owner/users", label: "Users" },
   { href: "/owner/usage", label: "Usage" },
 ];
 

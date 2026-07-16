@@ -276,6 +276,37 @@ export async function revokeAdminKey(
   if (!res.ok) throw new Error(`revokeAdminKey failed: ${res.status}`);
 }
 
+/** Operator-only: list dynamic keys for any team. */
+export async function listTeamKeys(
+  teamId: string,
+  masterKey: string
+): Promise<DynKey[]> {
+  const res = await fetch(
+    `${ROOMD_URL}/admin/teams/${encodeURIComponent(teamId)}/keys`,
+    {
+      headers: { Authorization: `Bearer ${masterKey}` },
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) throw new Error(`listTeamKeys failed: ${res.status}`);
+  const data = (await res.json()) as AdminEndpointResponse;
+  return data.keys ?? [];
+}
+
+/** Operator-only: revoke every dynamic key for a team. */
+export async function revokeAllTeamKeys(
+  teamId: string,
+  masterKey: string
+): Promise<number> {
+  const keys = await listTeamKeys(teamId, masterKey);
+  let n = 0;
+  for (const k of keys) {
+    await revokeAdminKey(k.keyId, masterKey);
+    n++;
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------------------
 // Admin: room invites
 // ---------------------------------------------------------------------------

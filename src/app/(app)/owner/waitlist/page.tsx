@@ -12,7 +12,7 @@ import {
 } from "@/components/owner/AcceptInviteDialog";
 import { formatDate } from "@/lib/utils";
 import type { WaitlistEntry } from "@/types";
-import { Check, Loader2, ShieldOff, X } from "lucide-react";
+import { Check, Loader2, ShieldOff, Trash2, X } from "lucide-react";
 
 /**
  * Waitlist inbox only. Accept → review dialog → Send/Copy confirms.
@@ -77,17 +77,23 @@ export default function OwnerWaitlistPage() {
     }
   }
 
-  async function revoke(email: string) {
-    setBusyEmail(email);
+  async function act(email: string, action: "disable" | "delete") {
+    if (action === "delete") {
+      const ok = window.confirm(
+        `Delete ${email} from the waitlist? Keys will be revoked and the row removed.`,
+      );
+      if (!ok) return;
+    }
+    setBusyEmail(`${email}:${action}`);
     setError(null);
     try {
       const res = await fetch("/api/admin/access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "revoke", email, source: "waitlist" }),
+        body: JSON.stringify({ action, email, source: "waitlist" }),
       });
       if (!res.ok) {
-        setError("Could not revoke this key");
+        setError(action === "delete" ? "Could not delete" : "Could not disable");
         return;
       }
       void refresh();
@@ -185,7 +191,8 @@ export default function OwnerWaitlistPage() {
           <CardHeader>
             <CardTitle>History</CardTitle>
             <CardDescription className="mt-1">
-              Accepted, declined, and revoked waitlist requests.
+              Accepted, declined, and disabled waitlist requests. Disable keeps the row;
+              Delete removes it.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -213,7 +220,7 @@ export default function OwnerWaitlistPage() {
                           </Badge>
                         ) : w.status === "revoked" ? (
                           <Badge variant="outline" className="text-xs text-muted-foreground">
-                            Revoked
+                            Disabled
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-xs text-muted-foreground">
@@ -222,22 +229,42 @@ export default function OwnerWaitlistPage() {
                         )}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {w.status === "invited" && w.keyId && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 text-destructive hover:text-destructive"
-                            disabled={busyEmail === w.email}
-                            onClick={() => void revoke(w.email)}
-                          >
-                            {busyEmail === w.email ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <ShieldOff className="h-3.5 w-3.5" />
-                            )}
-                            Revoke
-                          </Button>
-                        )}
+                        <div className="flex justify-end gap-1.5">
+                          {w.status === "invited" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              disabled={busyEmail === `${w.email}:disable`}
+                              onClick={() => void act(w.email, "disable")}
+                            >
+                              {busyEmail === `${w.email}:disable` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <ShieldOff className="h-3.5 w-3.5" />
+                              )}
+                              Disable
+                            </Button>
+                          )}
+                          {(w.status === "invited" ||
+                            w.status === "revoked" ||
+                            w.status === "declined") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 text-destructive hover:text-destructive"
+                              disabled={busyEmail === `${w.email}:delete`}
+                              onClick={() => void act(w.email, "delete")}
+                            >
+                              {busyEmail === `${w.email}:delete` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

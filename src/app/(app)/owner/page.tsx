@@ -13,7 +13,7 @@ import {
 } from "@/components/owner/AcceptInviteDialog";
 import { formatDate } from "@/lib/utils";
 import type { OrgInviteEntry } from "@/types";
-import { Loader2, Send, ShieldOff } from "lucide-react";
+import { Loader2, Send, ShieldOff, Trash2 } from "lucide-react";
 
 /**
  * Owner → Invite: direct invites only (separate from waitlist).
@@ -54,16 +54,23 @@ export default function OwnerInvitePage() {
     }
   }
 
-  async function revoke(email: string) {
-    setRevoking(email);
+  async function act(email: string, action: "disable" | "delete") {
+    if (action === "delete") {
+      const ok = window.confirm(
+        `Delete ${email}? Their keys will be revoked and this invite row removed.`,
+      );
+      if (!ok) return;
+    }
+    setRevoking(`${email}:${action}`);
+    setError(null);
     try {
       const res = await fetch("/api/admin/access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "revoke", email, source: "direct" }),
+        body: JSON.stringify({ action, email, source: "direct" }),
       });
       if (!res.ok) {
-        setError("Could not revoke this key");
+        setError(action === "delete" ? "Could not delete" : "Could not disable");
         return;
       }
       void refresh();
@@ -123,7 +130,7 @@ export default function OwnerInvitePage() {
         <CardHeader>
           <CardTitle>Sent invites</CardTitle>
           <CardDescription className="mt-1">
-            Orgs you invited. Revoke pulls their API key.
+            Orgs you invited. Disable pulls their key but keeps the row; Delete removes them.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -158,27 +165,43 @@ export default function OwnerInvitePage() {
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-xs text-muted-foreground">
-                            Revoked
+                            Disabled
                           </Badge>
                         )}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {i.status === "delivered" && (
+                        <div className="flex justify-end gap-1.5">
+                          {i.status === "delivered" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              disabled={revoking === `${i.email}:disable`}
+                              onClick={() => void act(i.email, "disable")}
+                            >
+                              {revoking === `${i.email}:disable` ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <ShieldOff className="h-3.5 w-3.5" />
+                              )}
+                              Disable
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
                             className="gap-1.5 text-destructive hover:text-destructive"
-                            disabled={revoking === i.email}
-                            onClick={() => void revoke(i.email)}
+                            disabled={revoking === `${i.email}:delete`}
+                            onClick={() => void act(i.email, "delete")}
                           >
-                            {revoking === i.email ? (
+                            {revoking === `${i.email}:delete` ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <ShieldOff className="h-3.5 w-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" />
                             )}
-                            Revoke
+                            Delete
                           </Button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   ))}

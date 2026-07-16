@@ -10,12 +10,17 @@ import {
   markOrgInviteRevoked,
   markWaitlistInvited,
   markWaitlistRevoked,
+  removeFromWaitlist,
   removeOrgInvitePending,
+  deleteOrgInvite,
   saveAccessDraft,
   upsertOrgInvite,
+  getUserByTeamId,
+  disableUser,
+  deleteUser,
   type AccessSource,
 } from "@/lib/redis";
-import { provisionTeamKey, revokeAdminKey } from "@/lib/roomd";
+import { provisionTeamKey, revokeAdminKey, revokeAllTeamKeys } from "@/lib/roomd";
 import { waitlistTeamId } from "@/lib/teams";
 import { sendInviteEmail } from "@/lib/mail";
 import { buildInviteEmailHtml } from "@/lib/email/invite-template";
@@ -27,7 +32,8 @@ import type { OrgInviteEntry } from "@/types";
  * prepare  — mint key + draft (does NOT accept waitlist / does NOT deliver)
  * confirm  — Send email or Copy key → then mark accepted/delivered
  * abandon  — dialog closed without delivery → revoke minted key
- * revoke   — pull access for a delivered invite
+ * disable  — revoke API key(s), keep the row (alias: revoke)
+ * delete   — revoke keys and remove the invite/waitlist row (+ linked user if any)
  */
 
 const prepareSchema = z.object({
@@ -48,8 +54,21 @@ const abandonSchema = z.object({
   email: z.string().trim().email().max(254),
 });
 
+const disableSchema = z.object({
+  action: z.literal("disable"),
+  email: z.string().trim().email().max(254),
+  source: z.enum(["direct", "waitlist"]),
+});
+
+/** Alias kept for older UI clients that still send action=revoke. */
 const revokeSchema = z.object({
   action: z.literal("revoke"),
+  email: z.string().trim().email().max(254),
+  source: z.enum(["direct", "waitlist"]),
+});
+
+const deleteSchema = z.object({
+  action: z.literal("delete"),
   email: z.string().trim().email().max(254),
   source: z.enum(["direct", "waitlist"]),
 });
@@ -58,7 +77,9 @@ const bodySchema = z.discriminatedUnion("action", [
   prepareSchema,
   confirmSchema,
   abandonSchema,
+  disableSchema,
   revokeSchema,
+  deleteSchema,
 ]);
 
 function loginUrl() {
@@ -112,7 +133,10 @@ export async function POST(req: NextRequest) {
   if (body.action === "abandon") {
     return abandon(email, mk);
   }
-  return revoke(email, body.source, mk);
+  if (body.action === "delete") {
+    return deleteAccess(email, body.source, mk);
+  }
+  return disableAccess(email, body.source, mk);
 }
 
 async function prepare(email: string, source: AccessSource, mk: string) {
@@ -244,30 +268,84 @@ async function abandon(email: string, mk: string) {
   }
 }
 
-async function revoke(email: string, source: AccessSource, mk: string) {
+/** Disable = revoke keys, keep the history row. */
+async function disableAccess(email: string, source: AccessSource, mk: string) {
   try {
-    let keyId: string | undefined;
-    if (source === "direct") {
+    const teamId = await resolveTeamId(email, source);
+    if (teamId) {
+      try {
+        await revokeAllTeamKeys(teamId, mk);
+      } catch (err) {
+        console.error("[access:disable:keys]", err instanceof Error ? err.message : err);
+      }
+      const user = await getUserByTeamId(teamId);
+      if (user) await disableUser(user.id);
+    } else if (source === "direct") {
       const invite = await getOrgInvite(email);
-      keyId = invite?.keyId;
-      if (keyId) {
-        await revokeAdminKey(keyId, mk);
-        await markOrgInviteRevoked(email);
+      if (invite?.keyId) await revokeAdminKey(invite.keyId, mk);
+    } else {
+      const entry = (await listWaitlist()).find((e) => e.email === email);
+      if (entry?.keyId) await revokeAdminKey(entry.keyId, mk);
+    }
+
+    if (source === "direct") await markOrgInviteRevoked(email);
+    else await markWaitlistRevoked(email);
+
+    return NextResponse.json({ ok: true, email, action: "disable" });
+  } catch (err) {
+    console.error("[access:disable]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to disable" }, { status: 500 });
+  }
+}
+
+/** Delete = revoke keys and remove the row (and linked dashboard user). */
+async function deleteAccess(email: string, source: AccessSource, mk: string) {
+  try {
+    const teamId = await resolveTeamId(email, source);
+    if (teamId) {
+      try {
+        await revokeAllTeamKeys(teamId, mk);
+      } catch (err) {
+        console.error("[access:delete:keys]", err instanceof Error ? err.message : err);
+      }
+      const user = await getUserByTeamId(teamId);
+      if (user) await deleteUser(user.id);
+    } else if (source === "direct") {
+      const invite = await getOrgInvite(email);
+      if (invite?.keyId) {
+        try {
+          await revokeAdminKey(invite.keyId, mk);
+        } catch {
+          /* already gone */
+        }
       }
     } else {
       const entry = (await listWaitlist()).find((e) => e.email === email);
-      keyId = entry?.keyId;
-      if (keyId) {
-        await revokeAdminKey(keyId, mk);
-        await markWaitlistRevoked(email);
+      if (entry?.keyId) {
+        try {
+          await revokeAdminKey(entry.keyId, mk);
+        } catch {
+          /* already gone */
+        }
       }
     }
-    if (!keyId) {
-      return NextResponse.json({ error: "No key to revoke" }, { status: 404 });
-    }
-    return NextResponse.json({ ok: true, email });
+
+    if (source === "direct") await deleteOrgInvite(email);
+    else await removeFromWaitlist(email);
+
+    return NextResponse.json({ ok: true, email, action: "delete" });
   } catch (err) {
-    console.error("[access:revoke]", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Failed to revoke key" }, { status: 500 });
+    console.error("[access:delete]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
+}
+
+async function resolveTeamId(
+  email: string,
+  source: AccessSource,
+): Promise<string | undefined> {
+  if (source === "direct") {
+    return (await getOrgInvite(email))?.teamId;
+  }
+  return (await listWaitlist()).find((e) => e.email === email)?.teamId;
 }

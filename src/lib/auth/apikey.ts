@@ -24,6 +24,8 @@ export const apikeyProvider = Credentials({
       createdAt: new Date().toISOString(),
     });
 
+    if (user.disabledAt) return null;
+
     // If they logged in with a different (newer) key, update the stored one.
     if (user.apiKey !== apiKey) {
       await updateUser(user.id, { apiKey });

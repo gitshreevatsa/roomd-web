@@ -22,7 +22,7 @@ export async function getServerIdentity(): Promise<ServerIdentity | null> {
   if (!session?.user?.id) return null;
 
   const user = await getUserById(session.user.id);
-  if (!user) return null;
+  if (!user || user.disabledAt) return null;
 
   return { userId: user.id, teamId: user.teamId, apiKey: user.apiKey };
 }

@@ -150,6 +150,30 @@ export async function updateUser(
   await redis.set(`app:user:${id}`, serialiseUser(updated));
 }
 
+/** Soft-disable: keep the account row, block dashboard login. */
+export async function disableUser(id: string): Promise<void> {
+  await updateUser(id, { disabledAt: new Date().toISOString() });
+}
+
+/** Re-enable a disabled account (they still need a valid roomd key). */
+export async function enableUser(id: string): Promise<void> {
+  const existing = await getUserById(id);
+  if (!existing) throw new Error(`User ${id} not found`);
+  const rest = { ...existing };
+  delete rest.disabledAt;
+  await redis.set(`app:user:${id}`, serialiseUser(rest));
+}
+
+/** Hard-delete the dashboard user record and its indexes. */
+export async function deleteUser(id: string): Promise<void> {
+  const existing = await getUserById(id);
+  if (!existing) return;
+  if (existing.email) await redis.del(`app:user:email:${existing.email}`);
+  await redis.del(`app:user:apikey:${existing.teamId}`);
+  await redis.del(`app:user:${id}`);
+  await redis.srem("app:users", id);
+}
+
 export async function linkAuthMethod(
   userId: string,
   provider: "google" | "github",
@@ -343,6 +367,12 @@ export async function markOrgInviteRevoked(email: string): Promise<void> {
 export async function removeOrgInvitePending(email: string): Promise<void> {
   const existing = await getOrgInvite(email);
   if (!existing || existing.status !== "pending_delivery") return;
+  await redis.srem("app:org-invites", email);
+  await redis.del(orgInviteMetaKey(email));
+}
+
+/** Permanently remove a direct invite row. */
+export async function deleteOrgInvite(email: string): Promise<void> {
   await redis.srem("app:org-invites", email);
   await redis.del(orgInviteMetaKey(email));
 }
