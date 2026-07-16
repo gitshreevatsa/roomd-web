@@ -108,8 +108,9 @@ export interface RoomSummary {
 
 export interface WaitlistEntry {
   email: string;
-  status: "pending" | "invited";
+  status: "pending" | "invited" | "declined";
   createdAt: string;
   invitedAt?: string;
+  declinedAt?: string;
   teamId?: string;
 }

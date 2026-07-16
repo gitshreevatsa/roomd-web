@@ -258,6 +258,23 @@ export async function markWaitlistInvited(email: string, teamId: string): Promis
   await redis.sadd("app:waitlist", email);
 }
 
+/** Decline a waitlist request. Keeps the row for history; no key is issued. */
+export async function markWaitlistDeclined(email: string): Promise<void> {
+  const existing = await redis.get<string>(waitlistMetaKey(email));
+  const base: WaitlistEntry =
+    existing
+      ? ((typeof existing === "string" ? JSON.parse(existing) : existing) as WaitlistEntry)
+      : { email, status: "pending", createdAt: new Date().toISOString() };
+
+  const updated: WaitlistEntry = {
+    ...base,
+    status: "declined",
+    declinedAt: new Date().toISOString(),
+  };
+  await redis.set(waitlistMetaKey(email), JSON.stringify(updated));
+  await redis.sadd("app:waitlist", email);
+}
+
 /** Remove one email from the waitlist. Scoped to a single, explicit entry. */
 export async function removeFromWaitlist(email: string): Promise<void> {
   await redis.srem("app:waitlist", email);

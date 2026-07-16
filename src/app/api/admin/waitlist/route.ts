@@ -1,21 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerIdentity, isOperator } from "@/lib/session";
-import { listWaitlist, markWaitlistInvited, removeFromWaitlist } from "@/lib/redis";
+import {
+  listWaitlist,
+  markWaitlistInvited,
+  markWaitlistDeclined,
+} from "@/lib/redis";
 import { provisionTeamKey } from "@/lib/roomd";
 import { waitlistTeamId } from "@/lib/teams";
 import { sendInviteEmail } from "@/lib/mail";
-
-const emailSchema = z.object({ email: z.string().trim().email().max(254) });
+import { buildInviteEmailHtml } from "@/lib/email/invite-template";
 
 /**
  * GET  list the waitlist (operator only).
- * POST invite one person: provision an isolated team, issue a key, return it once.
- * DELETE remove one person.
- *
- * All three require the operator (the master-key holder). A non-operator gets 403,
- * which is also how the dashboard decides whether to show the waitlist at all.
+ * POST actions:
+ *   prepare — mint a key, mark accepted, return secret + email HTML (no send)
+ *   send    — email an already-prepared key
+ *   decline — reject a pending request (no key)
  */
+
+const prepareSchema = z.object({
+  action: z.literal("prepare"),
+  email: z.string().trim().email().max(254),
+});
+
+const sendSchema = z.object({
+  action: z.literal("send"),
+  email: z.string().trim().email().max(254),
+  secret: z.string().min(8).max(256),
+});
+
+const declineSchema = z.object({
+  action: z.literal("decline"),
+  email: z.string().trim().email().max(254),
+});
+
+const bodySchema = z.discriminatedUnion("action", [
+  prepareSchema,
+  sendSchema,
+  declineSchema,
+]);
 
 export async function GET() {
   const identity = await getServerIdentity();
@@ -35,51 +59,78 @@ export async function POST(req: NextRequest) {
   if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isOperator(identity)) return NextResponse.json({ error: "Operator only" }, { status: 403 });
 
-  let email: string;
+  let body: z.infer<typeof bodySchema>;
   try {
-    email = emailSchema.parse(await req.json()).email.toLowerCase();
+    body = bodySchema.parse(await req.json());
   } catch {
-    return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
+  const email = body.email.toLowerCase();
+
+  if (body.action === "decline") {
+    try {
+      await markWaitlistDeclined(email);
+      return NextResponse.json({ email, status: "declined" });
+    } catch (err) {
+      console.error("[waitlist:decline]", err instanceof Error ? err.message : err);
+      return NextResponse.json({ error: "Failed to decline" }, { status: 500 });
+    }
+  }
+
+  if (body.action === "send") {
+    const loginUrl = `${process.env.NEXTAUTH_URL ?? "https://app.roomd.sh"}/login`;
+    try {
+      const mail = await sendInviteEmail({
+        to: email,
+        key: body.secret,
+        loginUrl,
+      });
+      return NextResponse.json({ email, emailed: mail.sent, reason: mail.reason });
+    } catch (err) {
+      console.error("[waitlist:send]", err instanceof Error ? err.message : err);
+      return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
+    }
+  }
+
+  // prepare — issue key + preview; do not email yet
   const masterKey = process.env.ROOMD_MASTER_KEY;
   if (!masterKey) {
     return NextResponse.json(
       { error: "ROOMD_MASTER_KEY is not configured, so teams cannot be provisioned." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   try {
-    // Provision an isolated team for this person and mint their sign-in key.
     const key = await provisionTeamKey(waitlistTeamId(email), masterKey, email);
     await markWaitlistInvited(email, key.teamId);
 
-    // Email it if SMTP is set up; otherwise the operator sends it by hand.
-    const loginUrl = `${process.env.NEXTAUTH_URL ?? ""}/login`;
-    const mail = await sendInviteEmail({ to: email, key: key.secret, loginUrl });
+    const loginUrl = `${process.env.NEXTAUTH_URL ?? "https://app.roomd.sh"}/login`;
+    const who = "You have been invited";
+    const scope = "You get your own private workspace.";
+    const html = buildInviteEmailHtml({
+      key: key.secret,
+      loginUrl,
+      who,
+      scope,
+    });
+    const text =
+      `${who} to roomd.\n\n` +
+      `Sign in at ${loginUrl} with this key:\n\n${key.secret}\n\n` +
+      `${scope} Keep the key somewhere safe.`;
 
-    // The secret is returned once, for the operator to send. It is not stored.
-    return NextResponse.json({ email, secret: key.secret, teamId: key.teamId, emailed: mail.sent });
+    return NextResponse.json({
+      email,
+      secret: key.secret,
+      teamId: key.teamId,
+      loginUrl,
+      html,
+      text,
+      emailed: false,
+    });
   } catch (err) {
-    console.error("[waitlist:invite]", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Failed to invite this person" }, { status: 500 });
-  }
-}
-
-export async function DELETE(req: NextRequest) {
-  const identity = await getServerIdentity();
-  if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isOperator(identity)) return NextResponse.json({ error: "Operator only" }, { status: 403 });
-
-  const email = new URL(req.url).searchParams.get("email");
-  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
-
-  try {
-    await removeFromWaitlist(email.toLowerCase());
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("[waitlist:remove]", err instanceof Error ? err.message : err);
-    return NextResponse.json({ error: "Failed to remove this entry" }, { status: 500 });
+    console.error("[waitlist:prepare]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to prepare invite" }, { status: 500 });
   }
 }
