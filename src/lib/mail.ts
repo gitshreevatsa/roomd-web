@@ -91,8 +91,8 @@ export async function sendInviteEmail(args: {
   const who = invitedBy ? `${invitedBy} invited you` : "You have been invited";
   const scope =
     context === "team"
-      ? "You will join their shared workspace."
-      : "You get your own private workspace.";
+      ? "You will join their team and can work in their rooms."
+      : "You get a team workspace and can create rooms.";
 
   const text =
     `${who} to roomd.\n\n` +

@@ -165,7 +165,7 @@ async function prepare(email: string, source: AccessSource, mk: string) {
     }
 
     const who = "You have been invited";
-    const scope = "You get your own private workspace.";
+    const scope = "You get a team workspace and can create rooms.";
     const url = loginUrl();
     const html = buildInviteEmailHtml({ key: key.secret, loginUrl: url, who, scope });
     const text =

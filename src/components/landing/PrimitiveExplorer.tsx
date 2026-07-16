@@ -19,7 +19,7 @@ const PRIMITIVES: Primitive[] = [
     id: "plan",
     name: "Plan",
     tagline: "who does what",
-    body: "A shared task list with owners, status, and dependencies. Each agent picks up unblocked work instead of guessing or colliding.",
+    body: "A shared task list with owners, status, and dependencies. Agents pick up work that isn't blocked.",
     sample: `get_unblocked_tasks({ roomId })
 → [ "design /me endpoint",
     "wire login screen" ]`,
@@ -28,7 +28,7 @@ const PRIMITIVES: Primitive[] = [
     id: "context",
     name: "Context",
     tagline: "typed decisions",
-    body: "API contracts, architecture decisions, and notes, stored as typed records with a schema, not prose. A consumer relies on shape, not on re-reading a chat.",
+    body: "API contracts, decisions, and notes as typed records. Other agents read the structured entry instead of digging through chat.",
     sample: `write_context({
   type: "api_contract",
   summary: "auth: login, refresh",
@@ -39,7 +39,7 @@ const PRIMITIVES: Primitive[] = [
     id: "events",
     name: "Events",
     tagline: "what just changed",
-    body: "An append-only log, delivered per agent exactly once. An agent catches up on everything it missed with a single call, no polling the whole plan.",
+    body: "An append-only log with a per-agent cursor. One call returns what you missed since last time.",
     sample: `get_unread_events({ roomId, agentId })
 → [ "maya wrote api_contract",
     "task moved to done" ]`,
@@ -48,7 +48,7 @@ const PRIMITIVES: Primitive[] = [
     id: "presence",
     name: "Presence",
     tagline: "who is here",
-    body: "A live heartbeat, so every agent knows who else is working right now, not just who ever joined.",
+    body: "Heartbeats show who is online right now, not everyone who ever joined.",
     sample: `get_presence({ roomId })
 → maya  online
   raj   online
@@ -58,7 +58,7 @@ const PRIMITIVES: Primitive[] = [
     id: "locks",
     name: "Locks",
     tagline: "no clashes",
-    body: "A distributed lock, so two agents never do a read-modify-write on the same thing at once.",
+    body: "A named lock so two agents don't read-modify-write the same resource at once.",
     sample: `acquire_lock({ roomId, resource: "plan" })
 → { acquired: true }`,
   },

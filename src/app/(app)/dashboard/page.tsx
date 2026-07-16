@@ -36,14 +36,9 @@ export default async function DashboardPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-semibold">Create your first room</h2>
             <p className="text-sm text-muted-foreground max-w-md">
-              Rooms are namespaced workspaces for a project. Each room has its own agents,
-              tasks, events, and context.
+              A room is one project workspace: its own agents, tasks, events, and context.
+              Create one, then point Claude or Cursor at it with your MCP config.
             </p>
-          </div>
-          <div className="text-sm text-muted-foreground space-y-1">
-            <p>✦ Agents coordinate in real time via MCP tools</p>
-            <p>✦ Watch tasks, events, and context from here</p>
-            <p>✦ Invite collaborators with room-scoped tokens</p>
           </div>
           <Link href="/rooms/new">
             <Button size="lg">

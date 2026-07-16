@@ -6,7 +6,7 @@ import { OwnerNav } from "@/components/owner/OwnerNav";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Usage — roomd" };
+export const metadata = { title: "Usage" };
 
 function Stat({ label, value }: { label: string; value: number | string }) {
   return (

@@ -617,8 +617,8 @@ function inviteMessage(invite: InviteResult | null): string {
   if (!invite) return "";
   const origin = typeof window !== "undefined" ? window.location.origin : "https://app.roomd.sh";
   return (
-    `You're in. Sign in to roomd at ${origin}/login with this key:\n\n` +
+    `Sign in to roomd at ${origin}/login with this key:\n\n` +
     `${invite.secret}\n\n` +
-    `It joins you to our shared workspace. Keep it somewhere safe.`
+    `It joins you to our team. Keep it somewhere safe.`
   );
 }

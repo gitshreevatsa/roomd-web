@@ -132,8 +132,8 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
                   <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                     {mcpBase}/mcp
                   </code>
-                  . Any MCP client that can reach an HTTP server with a Bearer
-                  header works — Windsurf, Continue, custom agents, etc.
+                  . Any MCP client that can send a Bearer header to an HTTP
+                  server works (Windsurf, Continue, custom agents, etc.).
                 </p>
               )}
 
@@ -170,7 +170,7 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
         </div>
       </Tabs>
 
-      {/* Step 2 — room identity (same for every client) */}
+      {/* Step 2: room identity (same for every client) */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Step 2: tell the agent which room to join</h3>
         <p className="text-sm text-muted-foreground">{guide.ruleHint}</p>
@@ -186,7 +186,7 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
         </p>
       </div>
 
-      {/* Step 3 — kickoff prompt */}
+      {/* Step 3: kickoff prompt */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Step 3: start the session</h3>
         <p className="text-sm text-muted-foreground">

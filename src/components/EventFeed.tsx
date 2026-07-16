@@ -41,7 +41,7 @@ export function EventFeed({ events, onRefresh, refreshing }: EventFeedProps) {
       <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground space-y-2">
         <p className="font-medium">No events yet.</p>
         <p className="text-sm max-w-sm">
-          Events appear here as agents coordinate: task updates, change requests, contract
+          Events show up here when agents post them: task updates, change requests, contract
           notifications, etc.
         </p>
       </div>

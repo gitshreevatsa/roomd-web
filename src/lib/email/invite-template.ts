@@ -20,7 +20,7 @@ export function buildInviteEmailHtml(args: {
 }): string {
   const { key, loginUrl, who, scope } = args;
   const preheader =
-    args.preheader ?? "Your roomd access key — sign in and open your private workspace.";
+    args.preheader ?? "Your roomd access key. Sign in and create a room.";
   const site = "https://roomd.sh";
   const safeKey = escapeHtml(key);
   const safeLogin = escapeHtml(loginUrl);
@@ -85,8 +85,8 @@ export function buildInviteEmailHtml(args: {
                             <tbody>
                               <tr>
                                 <td>
-                                  <p style="font-size:12px;line-height:24px;color:${PRIMARY};font-weight:700;letter-spacing:0.08em;margin:0 0 10px;text-transform:uppercase">You're in</p>
-                                  <h1 style="color:${INK};font-size:26px;font-weight:700;line-height:1.2;margin:0 0 16px">Welcome to roomd</h1>
+                                  <p style="font-size:12px;line-height:24px;color:${PRIMARY};font-weight:700;letter-spacing:0.08em;margin:0 0 10px;text-transform:uppercase">Invite</p>
+                                  <h1 style="color:${INK};font-size:26px;font-weight:700;line-height:1.2;margin:0 0 16px">Your roomd access</h1>
                                   <p style="font-size:16px;line-height:1.65;color:${INK};margin:0 0 14px">${safeWho} to <strong>roomd</strong>.</p>
                                   <p style="font-size:16px;line-height:1.65;color:${INK};margin:0 0 14px">${safeScope}</p>
 
@@ -134,7 +134,7 @@ export function buildInviteEmailHtml(args: {
                             &nbsp;&nbsp;·&nbsp;&nbsp;
                             <a href="${safeLogin}" style="color:${MUTED};text-decoration:underline" target="_blank">Sign in</a>
                           </p>
-                          <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:8px 0 0;text-align:center">Shared-state coordination for AI coding agents</p>
+                          <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:8px 0 0;text-align:center">Coordination rooms for AI coding agents</p>
                         </td>
                       </tr>
                     </tbody>

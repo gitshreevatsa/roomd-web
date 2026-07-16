@@ -107,7 +107,7 @@ export default function OwnerWaitlistPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Owner</h1>
         <p className="text-sm text-muted-foreground">
-          Landing-page requests only. Accept opens the invite for review — nothing is
+          Landing-page requests only. Accept opens the invite for review; nothing is
           accepted until you send or copy the key.
         </p>
       </div>

@@ -129,7 +129,7 @@ export function AcceptInviteDialog({
           <div className="space-y-4">
             {(phase === "sent" || phase === "copied") && (
               <Badge variant="green" className="text-xs">
-                {phase === "sent" ? "Email sent" : "Key copied — share it with them"}
+                {phase === "sent" ? "Email sent" : "Key copied. Share it with them."}
               </Badge>
             )}
 

@@ -31,7 +31,7 @@ export default async function SetupPage({ params }: Props) {
           <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
             {params.roomId}
           </code>
-          . Connect Claude Code, Cursor, or any MCP client — pick a tab below.
+          . Connect Claude Code, Cursor, or another MCP client. Pick a tab below.
         </p>
       </div>
 

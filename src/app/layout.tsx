@@ -19,12 +19,12 @@ export const metadata: Metadata = {
     template: "%s · roomd",
   },
   description:
-    "One shared workspace for your AI coding agents — plan, context, events, presence, and locks.",
+    "A shared room for your team's AI coding agents: plan, context, events, presence, and locks.",
   applicationName: "roomd",
   metadataBase: new URL("https://roomd.sh"),
   openGraph: {
     title: "roomd",
-    description: "One shared workspace for your AI coding agents.",
+    description: "A shared room for your team's AI coding agents.",
     siteName: "roomd",
     type: "website",
   },

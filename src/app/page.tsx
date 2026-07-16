@@ -4,9 +4,9 @@ import { auth } from "@/auth";
 import { LandingPage } from "@/components/landing/LandingPage";
 
 export const metadata: Metadata = {
-  title: "roomd: one shared workspace for your AI agents",
+  title: "roomd",
   description:
-    "Your engineers each run a coding agent on a different part of the project. roomd gives those agents one shared room to coordinate in, so they work together without stepping on each other.",
+    "Each engineer runs a coding agent. roomd gives those agents one shared room so they don't overwrite each other's work.",
 };
 
 export default async function RootPage() {

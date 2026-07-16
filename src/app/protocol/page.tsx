@@ -5,9 +5,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowRight, Download, FileText } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "The Room Protocol — technical report",
+  title: "The Room Protocol",
   description:
-    "Shared-State Coordination for Multi-Agent Software Development. The technical report behind roomd: read it in the browser or download the PDF.",
+    "Technical report on shared-state coordination for multi-agent software development. Read in the browser or download the PDF.",
 };
 
 const PAPER_HTML = "/the-room-protocol.html";
@@ -32,12 +32,12 @@ const terminology: [string, string][] = [
 ];
 
 const contributions = [
-  "The Room Protocol: one abstraction, the room, with a primitive set argued sufficient to coordinate independent coding agents.",
-  "A typed-context model: context entries carry a type and a per-type schema, so a consumer relies on shape rather than parsing prose.",
-  "A stateless, single-store reference architecture: a fresh MCP server per request over one Redis, durable and restartable.",
-  "A layered multi-tenancy and access model: three secret types, first-touch room ownership, and rate limiting that fails open.",
-  "A concurrency mechanism: a distributed plan lock, plus per-agent cursors that give each agent an exactly-once view of events.",
-  "An evaluation methodology for coordination overhead, handoff correctness, and concurrency safety.",
+  "The room abstraction and five primitives for coordinating independent coding agents.",
+  "Typed context: entries have a type and schema, so consumers read structure instead of parsing prose.",
+  "A stateless reference server: fresh MCP handler per request over one Redis store.",
+  "Multi-tenancy: team keys, first-touch room ownership, room-scoped invites, rate limits.",
+  "Concurrency: plan locks plus per-agent event cursors.",
+  "An evaluation plan for coordination overhead, handoff correctness, and concurrency safety.",
 ];
 
 export default function ProtocolPage() {
@@ -101,23 +101,20 @@ export default function ProtocolPage() {
           </h2>
           <div className="mt-4 space-y-4 text-[15px] leading-relaxed text-foreground/90">
             <p>
-              Large language model coding agents are effective in isolation but have no
-              native way to coordinate when several of them work on one software project.
-              The common workarounds, a human relaying state, agents exchanging messages,
-              or agents sharing only a repository, all treat coordination as
-              message-passing. This work argues the better primitive is shared state: a
-              small set of structured, persistent, queryable objects that agents read and
-              write instead of messaging one another.
+              LLM coding agents work well alone but have no built-in way to coordinate
+              when several of them share one project. The usual workarounds (a human
+              relaying state, agents chatting, or sharing only a repo) all treat
+              coordination as message-passing. This paper argues for shared state
+              instead: a small set of structured, persistent objects agents read and
+              write.
             </p>
             <p>
-              The Room Protocol organizes coordination around a single abstraction, the
-              room, which namespaces five state primitives (a plan, a typed context store,
-              an append-only event log, presence, and locks) and is the unit of ownership
-              and access control. It is exposed over the Model Context Protocol, so any
-              MCP-capable agent can participate without a custom client. The reference
-              implementation, roomd, is a fully stateless server backed entirely by a
-              single Redis: the properties that make coordination durable are the ones
-              that make the system multi-tenant and deployable.
+              The Room Protocol centers on one abstraction, the room. A room holds five
+              primitives (plan, typed context, events, presence, locks) and is the unit
+              of ownership. It is exposed over MCP so any capable client can join. The
+              reference implementation, roomd, is a stateless server on one Redis store.
+              The same choices that keep coordination durable also keep multi-tenant
+              deploy simple.
             </p>
           </div>
         </section>

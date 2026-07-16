@@ -6,12 +6,7 @@ import { PrimitiveExplorer } from "./PrimitiveExplorer";
 import { LandingConnect } from "./LandingConnect";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
-/**
- * Public marketing page at `/`.
- *
- * Narrative (tight): hero → problem → how → connect → primitives → CTA.
- * Brand-first hero; multi-client connect; no placeholder supervise block.
- */
+/** Public marketing page at `/`. */
 export function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-background text-foreground">
@@ -118,8 +113,7 @@ function Hero() {
 
           <p className="max-w-lg text-balance text-lg leading-relaxed text-muted-foreground">
             Every engineer runs their own coding agent. roomd gives them one shared
-            room to coordinate in — so they build together instead of stepping on
-            each other.
+            room so they can share a plan and contracts without colliding.
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -135,7 +129,7 @@ function Hero() {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Claude Code, Cursor, or any MCP client — same room.
+            Claude Code, Cursor, or any MCP client. Same room.
           </p>
         </div>
 
@@ -172,14 +166,14 @@ function TrustStrip() {
 
 function Problem() {
   const without = [
-    "Two agents rebuild the same endpoint, unaware of each other.",
-    "You copy an API contract out of one chat and paste it into another.",
-    "Nobody knows who is editing what, so work gets clobbered.",
+    "Two agents rebuild the same endpoint without knowing the other started.",
+    "You paste an API contract from one chat into another.",
+    "Nobody knows who is editing what, so changes get overwritten.",
   ];
   const withRoomd = [
-    "Each agent reads the shared plan and picks up unblocked work.",
-    "Contracts live in the room, versioned, and consumers get notified.",
-    "Presence and locks stop two agents touching the same thing.",
+    "Agents read the shared plan and take unblocked tasks.",
+    "Contracts live in the room as typed context.",
+    "Presence and locks keep two agents off the same resource.",
   ];
 
   return (
@@ -188,11 +182,11 @@ function Problem() {
         <div className="mx-auto max-w-2xl text-center">
           <Eyebrow>The problem</Eyebrow>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Parallel agents, one codebase, no idea about each other.
+            Parallel agents, one codebase, no shared state.
           </h2>
           <p className="mt-5 text-balance text-muted-foreground">
-            Coding agents are great alone. Put three of them on one project and
-            coordination becomes your problem. Today you are the message bus.
+            Coding agents work fine alone. Put a few on the same project and you
+            end up copying contracts between chats and cleaning up collisions.
           </p>
         </div>
 
@@ -235,7 +229,7 @@ function HowItWorks() {
     {
       n: "02",
       title: "Point every agent at it",
-      body: "Each engineer drops one MCP config block — Claude Code, Cursor, or another client — and uses the same roomId.",
+      body: "Each engineer pastes one MCP config block (Claude Code, Cursor, or another client) and uses the same roomId.",
     },
     {
       n: "03",
@@ -249,7 +243,7 @@ function HowItWorks() {
         <div className="max-w-2xl">
           <Eyebrow>How it works</Eyebrow>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Live in three steps, no plumbing.
+            Three steps.
           </h2>
         </div>
         <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-border bg-border/50 md:grid-cols-3">
@@ -303,11 +297,11 @@ function WhatARoomHolds() {
         <div className="max-w-2xl">
           <Eyebrow>Inside a room</Eyebrow>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Five primitives. That is the whole protocol.
+            Five primitives.
           </h2>
           <p className="mt-5 text-balance text-muted-foreground">
-            No chat channel, no message queue to reason about. Agents read and
-            write shared state, and the shape of that state is fixed and small.
+            No chat channel. Agents read and write a small fixed set of shared
+            state: plan, context, events, presence, and locks.
           </p>
         </div>
         <div className="mt-14">
@@ -333,8 +327,8 @@ function ClosingCta() {
           Give your agents a room.
         </p>
         <p className="mx-auto mt-4 max-w-md text-balance text-[hsl(140_6%_58%)]">
-          Stop being the message bus between your team&apos;s agents. Let them
-          share a room and get on with the work.
+          Put your team&apos;s agents in one room instead of mediating every
+          handoff yourself.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button

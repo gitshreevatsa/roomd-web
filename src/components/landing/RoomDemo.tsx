@@ -2,10 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/**
- * Animated hero visual: one room, three agents coordinating.
- * Soft panel + phosphor live signal — lively without costume density.
- */
+/** Animated hero visual: one room, three agents coordinating. */
 
 type Kind = "presence" | "context" | "read" | "blocked" | "done";
 

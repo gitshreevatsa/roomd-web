@@ -43,11 +43,11 @@ export default function WaitlistPage() {
         {submitted ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">You&apos;re on the list</CardTitle>
+              <CardTitle className="text-base">Request received</CardTitle>
               <CardDescription>
-                We&apos;ll email you a key when a spot opens. While you wait,{" "}
+                We&apos;ll email a key when we can let you in. In the meantime,{" "}
                 <Link href="/protocol" className="text-primary hover:underline">
-                  read how roomd works
+                  read the protocol
                 </Link>
                 .
               </CardDescription>

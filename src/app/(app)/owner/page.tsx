@@ -84,7 +84,7 @@ export default function OwnerInvitePage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Owner</h1>
         <p className="text-sm text-muted-foreground">
-          Invite orgs directly. They only appear here — not on the waitlist.
+          Invite orgs directly. They show up here, not on the waitlist.
         </p>
       </div>
 
