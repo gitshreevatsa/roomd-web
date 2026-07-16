@@ -14,8 +14,20 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "roomd: agent coordination dashboard",
-  description: "Watch and manage your AI agents in real time.",
+  title: {
+    default: "roomd",
+    template: "%s · roomd",
+  },
+  description:
+    "One shared workspace for your AI coding agents — plan, context, events, presence, and locks.",
+  applicationName: "roomd",
+  metadataBase: new URL("https://roomd.sh"),
+  openGraph: {
+    title: "roomd",
+    description: "One shared workspace for your AI coding agents.",
+    siteName: "roomd",
+    type: "website",
+  },
 };
 
 /**
