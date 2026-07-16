@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { OwnerNav } from "@/components/owner/OwnerNav";
 import {
@@ -10,17 +11,32 @@ import {
   prepareInvite,
   type PreparedInvite,
 } from "@/components/owner/AcceptInviteDialog";
-import { Loader2, Send } from "lucide-react";
+import { formatDate } from "@/lib/utils";
+import type { OrgInviteEntry } from "@/types";
+import { Loader2, Send, ShieldOff } from "lucide-react";
 
 /**
- * Owner → Invite: issue access directly. Opens the same review dialog as Accept
- * on the waitlist (preview → Send email or Copy key).
+ * Owner → Invite: direct invites only (separate from waitlist).
  */
 export default function OwnerInvitePage() {
   const [directEmail, setDirectEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [invite, setInvite] = useState<PreparedInvite | null>(null);
+  const [invites, setInvites] = useState<OrgInviteEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    const res = await fetch("/api/admin/access");
+    if (res.ok) {
+      const data = (await res.json()) as { invites: OrgInviteEntry[] };
+      setInvites(data.invites.filter((i) => i.status !== "pending_delivery"));
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   async function startInvite() {
     const email = directEmail.trim();
@@ -28,7 +44,7 @@ export default function OwnerInvitePage() {
     setLoading(true);
     setError(null);
     try {
-      const prepared = await prepareInvite(email);
+      const prepared = await prepareInvite(email, "direct");
       setInvite(prepared);
       setDirectEmail("");
     } catch (err) {
@@ -38,13 +54,30 @@ export default function OwnerInvitePage() {
     }
   }
 
+  async function revoke(email: string) {
+    setRevoking(email);
+    try {
+      const res = await fetch("/api/admin/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke", email, source: "direct" }),
+      });
+      if (!res.ok) {
+        setError("Could not revoke this key");
+        return;
+      }
+      void refresh();
+    } finally {
+      setRevoking(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Owner</h1>
         <p className="text-sm text-muted-foreground">
-          Invite someone who never joined the waitlist. You&apos;ll review the email, then
-          send or copy their key.
+          Invite orgs directly. They only appear here — not on the waitlist.
         </p>
       </div>
 
@@ -54,8 +87,7 @@ export default function OwnerInvitePage() {
         <CardHeader>
           <CardTitle>Invite an org</CardTitle>
           <CardDescription className="mt-1">
-            Enter their email. Next you&apos;ll see the invite preview before anything is
-            sent.
+            Enter their email, review the invite, then send or copy the key.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -87,7 +119,81 @@ export default function OwnerInvitePage() {
         </CardContent>
       </Card>
 
-      <AcceptInviteDialog invite={invite} onClose={() => setInvite(null)} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Sent invites</CardTitle>
+          <CardDescription className="mt-1">
+            Orgs you invited. Revoke pulls their API key.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {invites.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No invites sent yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-2 text-left font-medium">Email</th>
+                    <th className="px-4 py-2 text-left font-medium">Sent</th>
+                    <th className="px-4 py-2 text-left font-medium">Via</th>
+                    <th className="px-4 py-2 text-left font-medium">Status</th>
+                    <th className="px-4 py-2 text-right font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {invites.map((i) => (
+                    <tr key={i.email}>
+                      <td className="px-4 py-2 font-medium">{i.email}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {i.deliveredAt ? formatDate(i.deliveredAt) : formatDate(i.createdAt)}
+                      </td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {i.delivery === "email" ? "Email" : i.delivery === "copy" ? "Copied" : "—"}
+                      </td>
+                      <td className="px-4 py-2">
+                        {i.status === "delivered" ? (
+                          <Badge variant="green" className="text-xs">
+                            Active ···{i.keyHint}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            Revoked
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {i.status === "delivered" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-destructive hover:text-destructive"
+                            disabled={revoking === i.email}
+                            onClick={() => void revoke(i.email)}
+                          >
+                            {revoking === i.email ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <ShieldOff className="h-3.5 w-3.5" />
+                            )}
+                            Revoke
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AcceptInviteDialog
+        invite={invite}
+        onClose={() => setInvite(null)}
+        onDelivered={() => void refresh()}
+      />
     </div>
   );
 }

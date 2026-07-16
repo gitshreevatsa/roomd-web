@@ -1,0 +1,273 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getServerIdentity, isOperator } from "@/lib/session";
+import {
+  deleteAccessDraft,
+  getAccessDraft,
+  getOrgInvite,
+  listOrgInvites,
+  listWaitlist,
+  markOrgInviteRevoked,
+  markWaitlistInvited,
+  markWaitlistRevoked,
+  removeOrgInvitePending,
+  saveAccessDraft,
+  upsertOrgInvite,
+  type AccessSource,
+} from "@/lib/redis";
+import { provisionTeamKey, revokeAdminKey } from "@/lib/roomd";
+import { waitlistTeamId } from "@/lib/teams";
+import { sendInviteEmail } from "@/lib/mail";
+import { buildInviteEmailHtml } from "@/lib/email/invite-template";
+import type { OrgInviteEntry } from "@/types";
+
+/**
+ * Unified access issuance for Owner portal.
+ *
+ * prepare  — mint key + draft (does NOT accept waitlist / does NOT deliver)
+ * confirm  — Send email or Copy key → then mark accepted/delivered
+ * abandon  — dialog closed without delivery → revoke minted key
+ * revoke   — pull access for a delivered invite
+ */
+
+const prepareSchema = z.object({
+  action: z.literal("prepare"),
+  email: z.string().trim().email().max(254),
+  source: z.enum(["direct", "waitlist"]),
+});
+
+const confirmSchema = z.object({
+  action: z.literal("confirm"),
+  email: z.string().trim().email().max(254),
+  secret: z.string().min(8).max(256),
+  delivery: z.enum(["email", "copy"]),
+});
+
+const abandonSchema = z.object({
+  action: z.literal("abandon"),
+  email: z.string().trim().email().max(254),
+});
+
+const revokeSchema = z.object({
+  action: z.literal("revoke"),
+  email: z.string().trim().email().max(254),
+  source: z.enum(["direct", "waitlist"]),
+});
+
+const bodySchema = z.discriminatedUnion("action", [
+  prepareSchema,
+  confirmSchema,
+  abandonSchema,
+  revokeSchema,
+]);
+
+function loginUrl() {
+  return `${process.env.NEXTAUTH_URL ?? "https://app.roomd.sh"}/login`;
+}
+
+function masterKey() {
+  return process.env.ROOMD_MASTER_KEY;
+}
+
+export async function GET() {
+  const identity = await getServerIdentity();
+  if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isOperator(identity)) return NextResponse.json({ error: "Operator only" }, { status: 403 });
+
+  try {
+    return NextResponse.json({ invites: await listOrgInvites() });
+  } catch (err) {
+    console.error("[access:list]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to load invites" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const identity = await getServerIdentity();
+  if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isOperator(identity)) return NextResponse.json({ error: "Operator only" }, { status: 403 });
+
+  let body: z.infer<typeof bodySchema>;
+  try {
+    body = bodySchema.parse(await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  const email = body.email.toLowerCase();
+  const mk = masterKey();
+  if (!mk) {
+    return NextResponse.json(
+      { error: "ROOMD_MASTER_KEY is not configured" },
+      { status: 500 },
+    );
+  }
+
+  if (body.action === "prepare") {
+    return prepare(email, body.source, mk);
+  }
+  if (body.action === "confirm") {
+    return confirm(email, body.secret, body.delivery);
+  }
+  if (body.action === "abandon") {
+    return abandon(email, mk);
+  }
+  return revoke(email, body.source, mk);
+}
+
+async function prepare(email: string, source: AccessSource, mk: string) {
+  try {
+    const key = await provisionTeamKey(waitlistTeamId(email), mk, email);
+    const draft = {
+      email,
+      source,
+      teamId: key.teamId,
+      keyId: key.keyId,
+      keyHint: key.secret.slice(-4),
+      createdAt: new Date().toISOString(),
+    };
+    await saveAccessDraft(draft);
+
+    if (source === "direct") {
+      const entry: OrgInviteEntry = {
+        email,
+        status: "pending_delivery",
+        teamId: key.teamId,
+        keyId: key.keyId,
+        keyHint: draft.keyHint,
+        createdAt: draft.createdAt,
+      };
+      await upsertOrgInvite(entry);
+    }
+
+    const who = "You have been invited";
+    const scope = "You get your own private workspace.";
+    const url = loginUrl();
+    const html = buildInviteEmailHtml({ key: key.secret, loginUrl: url, who, scope });
+    const text =
+      `${who} to roomd.\n\n` +
+      `Sign in at ${url} with this key:\n\n${key.secret}\n\n` +
+      `${scope} Keep the key somewhere safe.`;
+
+    return NextResponse.json({
+      email,
+      source,
+      secret: key.secret,
+      keyId: key.keyId,
+      teamId: key.teamId,
+      loginUrl: url,
+      html,
+      text,
+    });
+  } catch (err) {
+    console.error("[access:prepare]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to prepare invite" }, { status: 500 });
+  }
+}
+
+async function confirm(
+  email: string,
+  secret: string,
+  delivery: "email" | "copy",
+) {
+  try {
+    const draft = await getAccessDraft(email);
+    if (!draft) {
+      return NextResponse.json(
+        { error: "Invite expired or was cancelled. Start again." },
+        { status: 409 },
+      );
+    }
+
+    let emailed = false;
+    let reason: string | undefined;
+    if (delivery === "email") {
+      const mail = await sendInviteEmail({ to: email, key: secret, loginUrl: loginUrl() });
+      emailed = mail.sent;
+      reason = mail.reason;
+      if (!emailed) {
+        return NextResponse.json({ emailed: false, reason }, { status: 502 });
+      }
+    }
+
+    if (draft.source === "waitlist") {
+      await markWaitlistInvited(email, draft.teamId, draft.keyId);
+    } else {
+      const existing = (await getOrgInvite(email)) ?? {
+        email,
+        status: "pending_delivery" as const,
+        teamId: draft.teamId,
+        keyId: draft.keyId,
+        keyHint: draft.keyHint,
+        createdAt: draft.createdAt,
+      };
+      await upsertOrgInvite({
+        ...existing,
+        status: "delivered",
+        deliveredAt: new Date().toISOString(),
+        delivery,
+        teamId: draft.teamId,
+        keyId: draft.keyId,
+        keyHint: draft.keyHint,
+      });
+    }
+
+    await deleteAccessDraft(email);
+    return NextResponse.json({ email, emailed, delivery, confirmed: true });
+  } catch (err) {
+    console.error("[access:confirm]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to confirm invite" }, { status: 500 });
+  }
+}
+
+async function abandon(email: string, mk: string) {
+  try {
+    const draft = await getAccessDraft(email);
+    if (draft) {
+      try {
+        await revokeAdminKey(draft.keyId, mk);
+      } catch (err) {
+        console.error("[access:abandon:revoke]", err instanceof Error ? err.message : err);
+      }
+      await deleteAccessDraft(email);
+    }
+
+    const invite = await getOrgInvite(email);
+    if (invite?.status === "pending_delivery") {
+      await removeOrgInvitePending(email);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[access:abandon]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to cancel invite" }, { status: 500 });
+  }
+}
+
+async function revoke(email: string, source: AccessSource, mk: string) {
+  try {
+    let keyId: string | undefined;
+    if (source === "direct") {
+      const invite = await getOrgInvite(email);
+      keyId = invite?.keyId;
+      if (keyId) {
+        await revokeAdminKey(keyId, mk);
+        await markOrgInviteRevoked(email);
+      }
+    } else {
+      const entry = (await listWaitlist()).find((e) => e.email === email);
+      keyId = entry?.keyId;
+      if (keyId) {
+        await revokeAdminKey(keyId, mk);
+        await markWaitlistRevoked(email);
+      }
+    }
+    if (!keyId) {
+      return NextResponse.json({ error: "No key to revoke" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, email });
+  } catch (err) {
+    console.error("[access:revoke]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Failed to revoke key" }, { status: 500 });
+  }
+}

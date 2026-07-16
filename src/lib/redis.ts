@@ -206,12 +206,26 @@ export async function getRoomMeta(roomId: string): Promise<RoomMeta | null> {
 }
 
 // ---------------------------------------------------------------------------
-// Waitlist
+// Waitlist (landing-page requests only — never mixed with direct invites)
 // ---------------------------------------------------------------------------
 
-import type { WaitlistEntry } from "@/types";
+import type { OrgInviteEntry, WaitlistEntry } from "@/types";
 
 const waitlistMetaKey = (email: string) => `app:waitlist:meta:${email}`;
+const orgInviteMetaKey = (email: string) => `app:org-invite:meta:${email}`;
+const accessDraftKey = (email: string) => `app:access-draft:${email}`;
+
+export type AccessSource = "direct" | "waitlist";
+
+/** In-flight invite: key minted, not yet delivered (Send/Copy). */
+export interface AccessDraft {
+  email: string;
+  source: AccessSource;
+  teamId: string;
+  keyId: string;
+  keyHint: string;
+  createdAt: string;
+}
 
 /**
  * Record a waitlist signup. Idempotent: joining twice keeps the original entry
@@ -239,8 +253,15 @@ export async function listWaitlist(): Promise<WaitlistEntry[]> {
   return entries.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
 }
 
-/** Mark a waitlisted email as invited and record the team it was issued. */
-export async function markWaitlistInvited(email: string, teamId: string): Promise<void> {
+/**
+ * Mark a waitlisted email as accepted. Only touches the waitlist set — never
+ * used for direct Owner → Invite rows.
+ */
+export async function markWaitlistInvited(
+  email: string,
+  teamId: string,
+  keyId?: string,
+): Promise<void> {
   const existing = await redis.get<string>(waitlistMetaKey(email));
   const base: WaitlistEntry =
     existing
@@ -252,10 +273,9 @@ export async function markWaitlistInvited(email: string, teamId: string): Promis
     status: "invited",
     invitedAt: new Date().toISOString(),
     teamId,
+    ...(keyId ? { keyId } : {}),
   };
   await redis.set(waitlistMetaKey(email), JSON.stringify(updated));
-  // Ensure directly-invited people (never on the waitlist) still appear in the list.
-  await redis.sadd("app:waitlist", email);
 }
 
 /** Decline a waitlist request. Keeps the row for history; no key is issued. */
@@ -272,11 +292,89 @@ export async function markWaitlistDeclined(email: string): Promise<void> {
     declinedAt: new Date().toISOString(),
   };
   await redis.set(waitlistMetaKey(email), JSON.stringify(updated));
-  await redis.sadd("app:waitlist", email);
 }
 
 /** Remove one email from the waitlist. Scoped to a single, explicit entry. */
 export async function removeFromWaitlist(email: string): Promise<void> {
   await redis.srem("app:waitlist", email);
   await redis.del(waitlistMetaKey(email));
+}
+
+// ---------------------------------------------------------------------------
+// Direct org invites (Owner → Invite). Separate from waitlist.
+// ---------------------------------------------------------------------------
+
+export async function listOrgInvites(): Promise<OrgInviteEntry[]> {
+  const emails = await redis.smembers("app:org-invites");
+  if (!emails.length) return [];
+  const metas = await Promise.all(emails.map((e) => redis.get<string>(orgInviteMetaKey(e))));
+  const entries: OrgInviteEntry[] = [];
+  for (let i = 0; i < emails.length; i++) {
+    const raw = metas[i];
+    if (!raw) continue;
+    entries.push((typeof raw === "string" ? JSON.parse(raw) : raw) as OrgInviteEntry);
+  }
+  return entries.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+}
+
+export async function upsertOrgInvite(entry: OrgInviteEntry): Promise<void> {
+  await redis.sadd("app:org-invites", entry.email);
+  await redis.set(orgInviteMetaKey(entry.email), JSON.stringify(entry));
+}
+
+export async function getOrgInvite(email: string): Promise<OrgInviteEntry | null> {
+  const raw = await redis.get<string>(orgInviteMetaKey(email));
+  if (!raw) return null;
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as OrgInviteEntry;
+}
+
+export async function markOrgInviteRevoked(email: string): Promise<void> {
+  const existing = await getOrgInvite(email);
+  if (!existing) return;
+  const updated: OrgInviteEntry = {
+    ...existing,
+    status: "revoked",
+    revokedAt: new Date().toISOString(),
+  };
+  await upsertOrgInvite(updated);
+}
+
+/** Drop a direct invite that was never delivered. */
+export async function removeOrgInvitePending(email: string): Promise<void> {
+  const existing = await getOrgInvite(email);
+  if (!existing || existing.status !== "pending_delivery") return;
+  await redis.srem("app:org-invites", email);
+  await redis.del(orgInviteMetaKey(email));
+}
+
+export async function markWaitlistRevoked(email: string): Promise<void> {
+  const existing = await redis.get<string>(waitlistMetaKey(email));
+  if (!existing) return;
+  const base = (typeof existing === "string" ? JSON.parse(existing) : existing) as WaitlistEntry;
+  const updated: WaitlistEntry = {
+    ...base,
+    status: "revoked",
+    revokedAt: new Date().toISOString(),
+    keyId: undefined,
+  };
+  await redis.set(waitlistMetaKey(email), JSON.stringify(updated));
+}
+
+// ---------------------------------------------------------------------------
+// Access drafts (prepared key, not yet Send/Copy confirmed)
+// ---------------------------------------------------------------------------
+
+export async function saveAccessDraft(draft: AccessDraft): Promise<void> {
+  // 1 hour TTL — abandoned dialogs don't leave drafts forever.
+  await redis.set(accessDraftKey(draft.email), JSON.stringify(draft), { ex: 60 * 60 });
+}
+
+export async function getAccessDraft(email: string): Promise<AccessDraft | null> {
+  const raw = await redis.get<string>(accessDraftKey(email));
+  if (!raw) return null;
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as AccessDraft;
+}
+
+export async function deleteAccessDraft(email: string): Promise<void> {
+  await redis.del(accessDraftKey(email));
 }

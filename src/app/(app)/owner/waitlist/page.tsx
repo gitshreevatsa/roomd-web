@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +12,11 @@ import {
 } from "@/components/owner/AcceptInviteDialog";
 import { formatDate } from "@/lib/utils";
 import type { WaitlistEntry } from "@/types";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, ShieldOff, X } from "lucide-react";
 
 /**
- * Waitlist inbox: Accept opens the invite review dialog; Decline rejects.
+ * Waitlist inbox only. Accept → review dialog → Send/Copy confirms.
+ * Direct invites live on /owner, not here.
  */
 export default function OwnerWaitlistPage() {
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
@@ -23,17 +24,17 @@ export default function OwnerWaitlistPage() {
   const [invite, setInvite] = useState<PreparedInvite | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function fetchWaitlist() {
+  const refresh = useCallback(async () => {
     const res = await fetch("/api/admin/waitlist");
     if (res.ok) {
       const data = (await res.json()) as { entries: WaitlistEntry[] };
       setWaitlist(data.entries);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    void fetchWaitlist();
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   const pending = useMemo(
     () => waitlist.filter((w) => w.status === "pending"),
@@ -48,9 +49,8 @@ export default function OwnerWaitlistPage() {
     setBusyEmail(email);
     setError(null);
     try {
-      const prepared = await prepareInvite(email);
+      const prepared = await prepareInvite(email, "waitlist");
       setInvite(prepared);
-      void fetchWaitlist();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not accept this request");
     } finally {
@@ -71,7 +71,26 @@ export default function OwnerWaitlistPage() {
         setError("Could not decline this request");
         return;
       }
-      void fetchWaitlist();
+      void refresh();
+    } finally {
+      setBusyEmail(null);
+    }
+  }
+
+  async function revoke(email: string) {
+    setBusyEmail(email);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "revoke", email, source: "waitlist" }),
+      });
+      if (!res.ok) {
+        setError("Could not revoke this key");
+        return;
+      }
+      void refresh();
     } finally {
       setBusyEmail(null);
     }
@@ -82,7 +101,8 @@ export default function OwnerWaitlistPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Owner</h1>
         <p className="text-sm text-muted-foreground">
-          People who requested access. Accept to review and send their key, or decline.
+          Landing-page requests only. Accept opens the invite for review — nothing is
+          accepted until you send or copy the key.
         </p>
       </div>
 
@@ -101,7 +121,7 @@ export default function OwnerWaitlistPage() {
             )}
           </CardTitle>
           <CardDescription className="mt-1">
-            New requests from roomd.sh/waitlist. Accept opens the invite email for review.
+            New requests from roomd.sh/waitlist.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -165,7 +185,7 @@ export default function OwnerWaitlistPage() {
           <CardHeader>
             <CardTitle>History</CardTitle>
             <CardDescription className="mt-1">
-              Accepted and declined requests.
+              Accepted, declined, and revoked waitlist requests.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -176,6 +196,7 @@ export default function OwnerWaitlistPage() {
                     <th className="px-4 py-2 text-left font-medium">Email</th>
                     <th className="px-4 py-2 text-left font-medium">Requested</th>
                     <th className="px-4 py-2 text-left font-medium">Status</th>
+                    <th className="px-4 py-2 text-right font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -190,10 +211,32 @@ export default function OwnerWaitlistPage() {
                           <Badge variant="green" className="text-xs">
                             Accepted
                           </Badge>
+                        ) : w.status === "revoked" ? (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            Revoked
+                          </Badge>
                         ) : (
                           <Badge variant="outline" className="text-xs text-muted-foreground">
                             Declined
                           </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {w.status === "invited" && w.keyId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-destructive hover:text-destructive"
+                            disabled={busyEmail === w.email}
+                            onClick={() => void revoke(w.email)}
+                          >
+                            {busyEmail === w.email ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <ShieldOff className="h-3.5 w-3.5" />
+                            )}
+                            Revoke
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -207,8 +250,11 @@ export default function OwnerWaitlistPage() {
 
       <AcceptInviteDialog
         invite={invite}
-        onClose={() => setInvite(null)}
-        onSent={() => void fetchWaitlist()}
+        onClose={() => {
+          setInvite(null);
+          void refresh();
+        }}
+        onDelivered={() => void refresh()}
       />
     </div>
   );

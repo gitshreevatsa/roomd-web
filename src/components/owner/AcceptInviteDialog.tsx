@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/CopyButton";
@@ -16,7 +16,9 @@ import { Loader2, Send } from "lucide-react";
 
 export interface PreparedInvite {
   email: string;
+  source: "direct" | "waitlist";
   secret: string;
+  keyId: string;
   html: string;
   text: string;
   loginUrl: string;
@@ -26,59 +28,84 @@ type Phase = "ready" | "sending" | "sent" | "copied";
 
 /**
  * Review the invite email, then deliver via Send or Copy.
- * Key is already minted; this dialog is about delivery, not provisioning.
+ * Closing without Send/Copy abandons the draft and revokes the minted key.
  */
 export function AcceptInviteDialog({
   invite,
   onClose,
-  onSent,
+  onDelivered,
 }: {
   invite: PreparedInvite | null;
   onClose: () => void;
-  onSent?: () => void;
+  onDelivered?: () => void;
 }) {
   const [phase, setPhase] = useState<Phase>("ready");
   const [sendError, setSendError] = useState<string | null>(null);
+  const delivered = useRef(false);
 
   useEffect(() => {
     setPhase("ready");
     setSendError(null);
+    delivered.current = false;
   }, [invite?.email, invite?.secret]);
 
-  async function sendEmail() {
+  async function confirm(delivery: "email" | "copy") {
     if (!invite) return;
-    setPhase("sending");
+    if (delivery === "email") setPhase("sending");
     setSendError(null);
     try {
-      const res = await fetch("/api/admin/waitlist", {
+      const res = await fetch("/api/admin/access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "send",
+          action: "confirm",
           email: invite.email,
           secret: invite.secret,
+          delivery,
         }),
       });
-      const data = (await res.json()) as { emailed?: boolean; reason?: string; error?: string };
-      if (!res.ok || !data.emailed) {
+      const data = (await res.json()) as {
+        confirmed?: boolean;
+        emailed?: boolean;
+        reason?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.confirmed) {
         setSendError(
           data.error ??
             data.reason ??
-            "Email did not send. Copy the key and share it manually.",
+            (delivery === "email"
+              ? "Email did not send. Try Copy key instead."
+              : "Could not confirm invite."),
         );
         setPhase("ready");
         return;
       }
-      setPhase("sent");
-      onSent?.();
+      delivered.current = true;
+      setPhase(delivery === "email" ? "sent" : "copied");
+      onDelivered?.();
     } catch {
-      setSendError("Email did not send. Copy the key and share it manually.");
+      setSendError("Something went wrong. Try again.");
       setPhase("ready");
     }
   }
 
-  function handleOpenChange(open: boolean) {
+  async function abandonIfNeeded() {
+    if (!invite || delivered.current) return;
+    try {
+      await fetch("/api/admin/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "abandon", email: invite.email }),
+      });
+    } catch {
+      // best-effort cleanup
+    }
+  }
+
+  async function handleOpenChange(open: boolean) {
     if (!open) {
+      await abandonIfNeeded();
       setPhase("ready");
       setSendError(null);
       onClose();
@@ -86,12 +113,15 @@ export function AcceptInviteDialog({
   }
 
   return (
-    <Dialog open={!!invite} onOpenChange={handleOpenChange}>
+    <Dialog open={!!invite} onOpenChange={(o) => void handleOpenChange(o)}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Accept {invite?.email}</DialogTitle>
+          <DialogTitle>
+            {invite?.source === "waitlist" ? "Accept" : "Invite"} {invite?.email}
+          </DialogTitle>
           <DialogDescription>
-            Review the invite email, then send it or copy the key. This key is shown once.
+            Preview the email, then send it or copy the key. Closing without either cancels
+            the invite.
           </DialogDescription>
         </DialogHeader>
 
@@ -127,23 +157,24 @@ export function AcceptInviteDialog({
         )}
 
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="ghost" onClick={() => handleOpenChange(false)}>
-            Done
+          <Button variant="ghost" onClick={() => void handleOpenChange(false)}>
+            {phase === "sent" || phase === "copied" ? "Done" : "Cancel"}
           </Button>
           <div className="flex flex-wrap justify-end gap-2">
-            <CopyButton
-              text={invite?.secret ?? ""}
-              label="Copy key"
-              onCopied={() => {
-                setPhase("copied");
-                onSent?.();
-              }}
-            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={!invite || phase === "sending" || phase === "sent" || phase === "copied"}
+              onClick={() => void confirm("copy")}
+            >
+              Copy key &amp; confirm
+            </Button>
             <CopyButton text={invite?.text ?? ""} label="Copy message" />
             <Button
               className="gap-1.5"
-              disabled={!invite || phase === "sending" || phase === "sent"}
-              onClick={() => void sendEmail()}
+              disabled={!invite || phase === "sending" || phase === "sent" || phase === "copied"}
+              onClick={() => void confirm("email")}
             >
               {phase === "sending" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -159,12 +190,14 @@ export function AcceptInviteDialog({
   );
 }
 
-/** Shared helper to prepare an invite (mint key + email HTML). */
-export async function prepareInvite(email: string): Promise<PreparedInvite> {
-  const res = await fetch("/api/admin/waitlist", {
+export async function prepareInvite(
+  email: string,
+  source: "direct" | "waitlist",
+): Promise<PreparedInvite> {
+  const res = await fetch("/api/admin/access", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "prepare", email }),
+    body: JSON.stringify({ action: "prepare", email, source }),
   });
   if (!res.ok) {
     const data = (await res.json().catch(() => ({}))) as { error?: string };

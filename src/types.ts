@@ -108,9 +108,24 @@ export interface RoomSummary {
 
 export interface WaitlistEntry {
   email: string;
-  status: "pending" | "invited" | "declined";
+  status: "pending" | "invited" | "declined" | "revoked";
   createdAt: string;
   invitedAt?: string;
   declinedAt?: string;
+  revokedAt?: string;
   teamId?: string;
+  keyId?: string;
+}
+
+/** Direct org invites issued from Owner → Invite (never mixed into waitlist). */
+export interface OrgInviteEntry {
+  email: string;
+  status: "pending_delivery" | "delivered" | "revoked";
+  teamId: string;
+  keyId: string;
+  keyHint: string;
+  createdAt: string;
+  deliveredAt?: string;
+  delivery?: "email" | "copy";
+  revokedAt?: string;
 }
