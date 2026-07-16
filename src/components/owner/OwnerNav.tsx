@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
+const LINKS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/owner", label: "Invite", exact: true },
   { href: "/owner/waitlist", label: "Waitlist" },
   { href: "/owner/usage", label: "Usage" },
-] as const;
+];
 
 export function OwnerNav() {
   const pathname = usePathname();
