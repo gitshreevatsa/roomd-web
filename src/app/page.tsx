@@ -10,8 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RootPage() {
-  // Signed-in users go straight to their dashboard. Everyone else, and the
-  // wider world, sees the landing page.
+  // On app.roomd.sh, middleware redirects `/` before this runs. On roomd.sh
+  // (and local/preview), signed-in users skip the landing page.
   const session = await auth();
   if (session?.user) redirect("/dashboard");
 
