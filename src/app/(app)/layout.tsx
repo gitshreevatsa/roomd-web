@@ -2,9 +2,35 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { getServerIdentity, isOperator } from "@/lib/session";
+import { deleteUser, getUserById } from "@/lib/redis";
+import { revokeAllTeamKeys } from "@/lib/roomd";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { DeleteAccountButton } from "@/components/DeleteAccountButton";
+
+async function deleteAccountAction() {
+  "use server";
+  const identity = await getServerIdentity();
+  if (!identity) redirect("/login");
+  const user = await getUserById(identity.userId);
+  if (!user) redirect("/login");
+  const master = process.env.ROOMD_MASTER_KEY;
+  if (master && user.apiKey === master) {
+    throw new Error("Operator account cannot self-delete");
+  }
+  if (master) {
+    try {
+      await revokeAllTeamKeys(user.teamId, master);
+    } catch {
+      /* best-effort */
+    }
+  }
+  await deleteUser(user.id);
+  await signOut({
+    redirectTo: process.env.MARKETING_URL ?? "https://roomd.sh",
+  });
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -15,7 +41,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Top nav */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 sm:gap-6">
@@ -42,10 +67,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             </span>
             <ThemeToggle />
             <Separator orientation="vertical" className="h-5 hidden sm:block" />
+            {!owner && <DeleteAccountButton action={deleteAccountAction} />}
             <form
               action={async () => {
                 "use server";
-                // Land on the marketing site, not the app login form.
                 await signOut({
                   redirectTo: process.env.MARKETING_URL ?? "https://roomd.sh",
                 });
