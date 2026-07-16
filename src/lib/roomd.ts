@@ -394,3 +394,58 @@ export async function validateApiKey(
     return { valid: false };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Admin: webhooks
+// ---------------------------------------------------------------------------
+
+export interface WebhookRow {
+  id: string;
+  url: string;
+  roomId?: string;
+  createdAt: string;
+  secretHint: string;
+}
+
+export async function listWebhooks(apiKey: string): Promise<WebhookRow[]> {
+  const res = await fetch(`${ROOMD_URL}/admin/webhooks`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`listWebhooks failed: ${res.status}`);
+  const data = (await res.json()) as { webhooks?: WebhookRow[] };
+  return data.webhooks ?? [];
+}
+
+export async function createWebhook(
+  apiKey: string,
+  url: string,
+  roomId?: string,
+): Promise<{ id: string; url: string; secret: string; roomId?: string; createdAt: string }> {
+  const res = await fetch(`${ROOMD_URL}/admin/webhooks`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url, roomId: roomId || undefined }),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`createWebhook failed: ${res.status}`);
+  return res.json() as Promise<{
+    id: string;
+    url: string;
+    secret: string;
+    roomId?: string;
+    createdAt: string;
+  }>;
+}
+
+export async function deleteWebhook(apiKey: string, webhookId: string): Promise<void> {
+  const res = await fetch(`${ROOMD_URL}/admin/webhooks/${encodeURIComponent(webhookId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`deleteWebhook failed: ${res.status}`);
+}

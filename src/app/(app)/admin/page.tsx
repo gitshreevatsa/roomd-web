@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { CopyButton } from "@/components/CopyButton";
 import { formatDate } from "@/lib/utils";
 import type { DynKey, InviteToken, RoomSummary } from "@/types";
+import type { WebhookRow } from "@/lib/roomd";
 import { Plus, Trash2, Send } from "lucide-react";
 
 interface InviteResult {
@@ -28,6 +29,9 @@ export default function AdminPage() {
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<string>("");
   const [invites, setInvites] = useState<InviteToken[]>([]);
+  const [webhooks, setWebhooks] = useState<WebhookRow[]>([]);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
 
   const [newKey, setNewKey] = useState<string | null>(null);
   const [newInvite, setNewInvite] = useState<string | null>(null);
@@ -46,6 +50,40 @@ export default function AdminPage() {
       const data = await res.json() as { keys: DynKey[] };
       setKeys(data.keys);
     }
+  }
+
+  async function fetchWebhooks() {
+    const res = await fetch("/api/admin/webhooks");
+    if (res.ok) {
+      const data = (await res.json()) as { webhooks: WebhookRow[] };
+      setWebhooks(data.webhooks);
+    }
+  }
+
+  async function addWebhook() {
+    const url = webhookUrl.trim();
+    if (!url) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/admin/webhooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { secret: string };
+        setNewWebhookSecret(data.secret);
+        setWebhookUrl("");
+        void fetchWebhooks();
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeWebhook(id: string) {
+    await fetch(`/api/admin/webhooks/${id}`, { method: "DELETE" });
+    void fetchWebhooks();
   }
 
   async function fetchRooms() {
@@ -91,6 +129,7 @@ export default function AdminPage() {
   useEffect(() => {
     fetchKeys();
     fetchRooms();
+    void fetchWebhooks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -262,6 +301,93 @@ export default function AdminPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Webhooks */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Webhooks</CardTitle>
+          <CardDescription className="mt-1">
+            HTTPS endpoints notified when room events are posted. Verify with the
+            X-Roomd-Signature HMAC header.
+          </CardDescription>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <Input
+              type="url"
+              placeholder="https://example.com/hooks/roomd"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              className="sm:max-w-md"
+            />
+            <Button
+              size="sm"
+              onClick={() => void addWebhook()}
+              disabled={loading || !webhookUrl.trim()}
+              className="gap-1.5 shrink-0"
+            >
+              <Plus className="h-4 w-4" />
+              Add webhook
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {webhooks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No webhooks yet.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">URL</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Secret</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Created</th>
+                    <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {webhooks.map((h) => (
+                    <tr key={h.id}>
+                      <td className="px-4 py-2 font-mono text-xs break-all">{h.url}</td>
+                      <td className="px-4 py-2 font-mono text-xs">{h.secretHint}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
+                        {h.createdAt ? formatDate(h.createdAt) : "-"}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive gap-1"
+                          onClick={() => void removeWebhook(h.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!newWebhookSecret} onOpenChange={(o) => !o && setNewWebhookSecret(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Webhook secret</DialogTitle>
+            <DialogDescription>
+              Save this now. It won&apos;t be shown again. Use it to verify X-Roomd-Signature.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border bg-muted p-3 font-mono text-sm break-all">
+            {newWebhookSecret}
+          </div>
+          <DialogFooter className="gap-2">
+            <CopyButton text={newWebhookSecret ?? ""} label="Copy secret" />
+            <Button variant="outline" onClick={() => setNewWebhookSecret(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Section 2: Room Invites */}
       <Card>
