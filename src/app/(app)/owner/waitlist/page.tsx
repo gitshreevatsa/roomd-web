@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OwnerNav } from "@/components/owner/OwnerNav";
 import {
   AcceptInviteDialog,
@@ -23,6 +24,7 @@ export default function OwnerWaitlistPage() {
   const [busyEmail, setBusyEmail] = useState<string | null>(null);
   const [invite, setInvite] = useState<PreparedInvite | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteEmail, setDeleteEmail] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/admin/waitlist");
@@ -78,12 +80,6 @@ export default function OwnerWaitlistPage() {
   }
 
   async function act(email: string, action: "disable" | "delete") {
-    if (action === "delete") {
-      const ok = window.confirm(
-        `Delete ${email} from the waitlist? Keys will be revoked and the row removed.`,
-      );
-      if (!ok) return;
-    }
     setBusyEmail(`${email}:${action}`);
     setError(null);
     try {
@@ -96,6 +92,7 @@ export default function OwnerWaitlistPage() {
         setError(action === "delete" ? "Could not delete" : "Could not disable");
         return;
       }
+      if (action === "delete") setDeleteEmail(null);
       void refresh();
     } finally {
       setBusyEmail(null);
@@ -254,7 +251,7 @@ export default function OwnerWaitlistPage() {
                               size="sm"
                               className="gap-1.5 text-destructive hover:text-destructive"
                               disabled={busyEmail === `${w.email}:delete`}
-                              onClick={() => void act(w.email, "delete")}
+                              onClick={() => setDeleteEmail(w.email)}
                             >
                               {busyEmail === `${w.email}:delete` ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -282,6 +279,23 @@ export default function OwnerWaitlistPage() {
           void refresh();
         }}
         onDelivered={() => void refresh()}
+      />
+
+      <ConfirmDialog
+        open={!!deleteEmail}
+        onOpenChange={(open) => {
+          if (!open && !busyEmail) setDeleteEmail(null);
+        }}
+        title="Delete from waitlist?"
+        description={
+          deleteEmail
+            ? `Delete ${deleteEmail} from the waitlist? Keys will be revoked and the row removed.`
+            : ""
+        }
+        loading={!!deleteEmail && busyEmail === `${deleteEmail}:delete`}
+        onConfirm={() => {
+          if (deleteEmail) void act(deleteEmail, "delete");
+        }}
       />
     </div>
   );

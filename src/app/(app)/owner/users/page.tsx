@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OwnerNav } from "@/components/owner/OwnerNav";
 import { formatDate } from "@/lib/utils";
 import { Loader2, ShieldOff, Trash2, Undo2 } from "lucide-react";
@@ -26,6 +27,7 @@ export default function OwnerUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [deleteUser, setDeleteUser] = useState<{ id: string; label: string } | null>(null);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/admin/users");
@@ -40,12 +42,6 @@ export default function OwnerUsersPage() {
   }, [refresh]);
 
   async function act(userId: string, action: "disable" | "enable" | "delete") {
-    if (action === "delete") {
-      const ok = window.confirm(
-        "Delete this user permanently? Their API keys will be revoked and the account removed.",
-      );
-      if (!ok) return;
-    }
     setBusy(`${userId}:${action}`);
     setError(null);
     try {
@@ -59,6 +55,7 @@ export default function OwnerUsersPage() {
         setError(data.error ?? "Action failed");
         return;
       }
+      if (action === "delete") setDeleteUser(null);
       void refresh();
     } finally {
       setBusy(null);
@@ -169,7 +166,12 @@ export default function OwnerUsersPage() {
                             size="sm"
                             className="gap-1.5 text-destructive hover:text-destructive"
                             disabled={busy === `${u.id}:delete`}
-                            onClick={() => void act(u.id, "delete")}
+                            onClick={() =>
+                              setDeleteUser({
+                                id: u.id,
+                                label: u.email ?? u.name ?? "this user",
+                              })
+                            }
                           >
                             {busy === `${u.id}:delete` ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -188,6 +190,23 @@ export default function OwnerUsersPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteUser}
+        onOpenChange={(open) => {
+          if (!open && !busy) setDeleteUser(null);
+        }}
+        title="Delete this user?"
+        description={
+          deleteUser
+            ? `Delete ${deleteUser.label} permanently? Their API keys will be revoked and the account removed.`
+            : ""
+        }
+        loading={!!deleteUser && busy === `${deleteUser.id}:delete`}
+        onConfirm={() => {
+          if (deleteUser) void act(deleteUser.id, "delete");
+        }}
+      />
     </div>
   );
 }

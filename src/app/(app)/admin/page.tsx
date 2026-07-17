@@ -12,11 +12,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyButton } from "@/components/CopyButton";
 import { formatDate } from "@/lib/utils";
 import type { DynKey, InviteToken, RoomSummary } from "@/types";
 import type { WebhookRow } from "@/lib/roomd";
 import { Plus, Trash2, Send } from "lucide-react";
+
+type PendingDelete =
+  | { kind: "key"; id: string; label: string }
+  | { kind: "invite"; id: string; label: string }
+  | { kind: "webhook"; id: string; label: string };
 
 interface InviteResult {
   email: string;
@@ -41,6 +47,8 @@ export default function AdminPage() {
   const [teammateEmail, setTeammateEmail] = useState("");
   const [keyNote, setKeyNote] = useState("");
   const [createKeyOpen, setCreateKeyOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -84,6 +92,23 @@ export default function AdminPage() {
   async function removeWebhook(id: string) {
     await fetch(`/api/admin/webhooks/${id}`, { method: "DELETE" });
     void fetchWebhooks();
+  }
+
+  async function confirmPendingDelete() {
+    if (!pendingDelete) return;
+    setConfirmBusy(true);
+    try {
+      if (pendingDelete.kind === "key") {
+        await revokeKey(pendingDelete.id);
+      } else if (pendingDelete.kind === "invite") {
+        await revokeInvite(pendingDelete.id);
+      } else {
+        await removeWebhook(pendingDelete.id);
+      }
+      setPendingDelete(null);
+    } finally {
+      setConfirmBusy(false);
+    }
   }
 
   async function fetchRooms() {
@@ -287,7 +312,13 @@ export default function AdminPage() {
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive gap-1"
-                          onClick={() => revokeKey(key.keyId)}
+                          onClick={() =>
+                            setPendingDelete({
+                              kind: "key",
+                              id: key.keyId,
+                              label: key.note || key.keyId.slice(0, 10),
+                            })
+                          }
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Revoke
@@ -356,7 +387,13 @@ export default function AdminPage() {
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive gap-1"
-                          onClick={() => void removeWebhook(h.id)}
+                          onClick={() =>
+                            setPendingDelete({
+                              kind: "webhook",
+                              id: h.id,
+                              label: h.url,
+                            })
+                          }
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Remove
@@ -473,7 +510,13 @@ export default function AdminPage() {
                           variant="ghost"
                           size="sm"
                           className="text-destructive hover:text-destructive gap-1"
-                          onClick={() => revokeInvite(inv.tokenId)}
+                          onClick={() =>
+                            setPendingDelete({
+                              kind: "invite",
+                              id: inv.tokenId,
+                              label: inv.tokenId.slice(0, 10),
+                            })
+                          }
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           Revoke
@@ -608,6 +651,32 @@ export default function AdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={(open) => {
+          if (!open && !confirmBusy) setPendingDelete(null);
+        }}
+        title={
+          pendingDelete?.kind === "key"
+            ? "Revoke this key?"
+            : pendingDelete?.kind === "invite"
+              ? "Revoke this invite?"
+              : "Remove this webhook?"
+        }
+        description={
+          pendingDelete?.kind === "key"
+            ? `“${pendingDelete.label}” will stop working immediately. Anyone using it will be signed out.`
+            : pendingDelete?.kind === "invite"
+              ? `Invite ${pendingDelete.label}… will no longer work.`
+              : `Stop sending events to ${pendingDelete?.label ?? "this endpoint"}.`
+        }
+        confirmLabel={
+          pendingDelete?.kind === "webhook" ? "Remove" : "Revoke"
+        }
+        loading={confirmBusy}
+        onConfirm={confirmPendingDelete}
+      />
     </div>
   );
 }
