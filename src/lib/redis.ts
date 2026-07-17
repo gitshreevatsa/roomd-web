@@ -262,6 +262,17 @@ export async function addToWaitlist(email: string): Promise<void> {
   await redis.set(waitlistMetaKey(email), JSON.stringify(meta), { nx: true });
 }
 
+/** One waitlist row by email, or null if never joined. */
+export async function getWaitlistEntry(email: string): Promise<WaitlistEntry | null> {
+  const raw = await redis.get<string>(waitlistMetaKey(email));
+  if (raw) {
+    return (typeof raw === "string" ? JSON.parse(raw) : raw) as WaitlistEntry;
+  }
+  const inSet = await redis.sismember("app:waitlist", email);
+  if (!inSet) return null;
+  return { email, status: "pending", createdAt: "" };
+}
+
 /** Every waitlist entry, newest first. Emails with no meta are treated as pending. */
 export async function listWaitlist(): Promise<WaitlistEntry[]> {
   const emails = await redis.smembers("app:waitlist");

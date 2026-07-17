@@ -6,10 +6,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { WaitlistJoinStatus } from "@/types";
+
+type Result = {
+  status: WaitlistJoinStatus;
+  message: string;
+};
+
+const TITLES: Record<WaitlistJoinStatus, string> = {
+  joined: "Request received",
+  already_user: "You're already in",
+  already_invited: "Check your invite",
+  already_pending: "You're already on the list",
+  declined: "Not available",
+};
 
 export default function WaitlistPage() {
   const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,14 +37,25 @@ export default function WaitlistPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      if (!res.ok) throw new Error("Failed");
-      setSubmitted(true);
+      const data = (await res.json()) as {
+        ok?: boolean;
+        status?: WaitlistJoinStatus;
+        message?: string;
+        error?: string;
+      };
+      if (!res.ok || !data.status || !data.message) {
+        throw new Error(data.error ?? "Failed");
+      }
+      setResult({ status: data.status, message: data.message });
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
+
+  const showSignIn =
+    result?.status === "already_user" || result?.status === "already_invited";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -40,18 +65,40 @@ export default function WaitlistPage() {
           <p className="text-sm text-muted-foreground">Shared rooms for AI coding agents</p>
         </div>
 
-        {submitted ? (
+        {result ? (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Request received</CardTitle>
-              <CardDescription>
-                We&apos;ll email a key when we can let you in. In the meantime,{" "}
-                <Link href="/protocol" className="text-primary hover:underline">
-                  read the protocol
-                </Link>
-                .
-              </CardDescription>
+              <CardTitle className="text-base">{TITLES[result.status]}</CardTitle>
+              <CardDescription>{result.message}</CardDescription>
             </CardHeader>
+            <CardContent className="space-y-3">
+              {showSignIn && (
+                <Button asChild className="w-full">
+                  <Link href="/login">Sign in</Link>
+                </Button>
+              )}
+              {result.status === "joined" || result.status === "already_pending" ? (
+                <p className="text-sm text-muted-foreground">
+                  In the meantime,{" "}
+                  <Link href="/protocol" className="text-primary hover:underline">
+                    read the protocol
+                  </Link>
+                  .
+                </p>
+              ) : null}
+              {result.status === "declined" ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setResult(null);
+                    setEmail("");
+                  }}
+                >
+                  Try another email
+                </Button>
+              ) : null}
+            </CardContent>
           </Card>
         ) : (
           <Card>
@@ -76,7 +123,7 @@ export default function WaitlistPage() {
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Joining…" : "Join waitlist →"}
+                  {loading ? "Checking…" : "Join waitlist →"}
                 </Button>
               </form>
             </CardContent>

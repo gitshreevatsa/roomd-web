@@ -119,6 +119,14 @@ export interface WaitlistEntry {
   keyId?: string;
 }
 
+/** Response status from POST /api/waitlist. */
+export type WaitlistJoinStatus =
+  | "joined"
+  | "already_user"
+  | "already_invited"
+  | "already_pending"
+  | "declined";
+
 /** Direct org invites issued from Owner → Invite (never mixed into waitlist). */
 export interface OrgInviteEntry {
   email: string;
