@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DOCS_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 function NavItem({
@@ -59,6 +60,17 @@ export function AppNav({ showOwner }: { showOwner: boolean }) {
       />
       <NavItem href="/admin" label="Admin" />
       {showOwner && <NavItem href="/owner" label="Owner" />}
+      <a
+        href={DOCS_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex"
+      >
+        <Button variant="ghost" size="sm" className="px-2 sm:px-3 gap-1.5">
+          Docs
+          <ExternalLink className="h-3 w-3 opacity-60" />
+        </Button>
+      </a>
     </nav>
   );
 }

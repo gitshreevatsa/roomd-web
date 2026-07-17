@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DOCS_URL } from "@/lib/site";
 
 const AUTH_MODE = process.env.NEXT_PUBLIC_AUTH_MODE ?? "apikey";
 
@@ -213,6 +214,17 @@ export default function LoginPage() {
             </Link>
           </p>
         )}
+        <p className="text-center text-sm text-muted-foreground">
+          New here?{" "}
+          <a
+            href={`${DOCS_URL}/quickstart`}
+            className="text-primary hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Read the docs →
+          </a>
+        </p>
       </div>
     </div>
   );
