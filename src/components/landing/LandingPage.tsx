@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Check, X } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { DOCS_URL } from "@/lib/site";
 import { RoomDemo } from "./RoomDemo";
 import { PrimitiveExplorer } from "./PrimitiveExplorer";
 import { LandingConnect } from "./LandingConnect";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 /** Public marketing page at `/`. */
 export function LandingPage() {
@@ -79,6 +80,13 @@ function Nav() {
           <a href="#room" className="transition-colors hover:text-foreground">
             Primitives
           </a>
+          <a
+            href={DOCS_URL}
+            className="transition-colors hover:text-foreground"
+            rel="noopener noreferrer"
+          >
+            Docs
+          </a>
           <Link href="/protocol" className="transition-colors hover:text-foreground">
             Protocol
           </Link>
@@ -124,12 +132,17 @@ function Hero() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/login">I have a key</Link>
+              <a href={`${DOCS_URL}/quickstart`} rel="noopener noreferrer">
+                Read the docs
+              </a>
             </Button>
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Claude Code, Cursor, or any MCP client. Same room.
+            Claude Code, Cursor, or any MCP client. Same room.{" "}
+            <Link href="/login" className="text-foreground underline-offset-4 hover:underline">
+              I have a key
+            </Link>
           </p>
         </div>
 
@@ -347,7 +360,9 @@ function ClosingCta() {
             variant="ghost"
             className="text-[hsl(140_10%_72%)] hover:bg-white/5 hover:text-white"
           >
-            <Link href="/login">I have a key</Link>
+            <a href={`${DOCS_URL}/quickstart`} rel="noopener noreferrer">
+              Read the docs
+            </a>
           </Button>
         </div>
       </div>
@@ -364,6 +379,9 @@ function Footer() {
           <span className="text-xs">The Room Protocol</span>
         </div>
         <div className="flex items-center gap-6">
+          <a href={DOCS_URL} className="hover:text-foreground" rel="noopener noreferrer">
+            Docs
+          </a>
           <Link href="/protocol" className="hover:text-foreground">
             Protocol
           </Link>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
@@ -9,6 +10,10 @@ import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DeleteAccountButton } from "@/components/DeleteAccountButton";
 import { AppNav } from "@/components/AppNav";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 async function deleteAccountAction() {
   "use server";

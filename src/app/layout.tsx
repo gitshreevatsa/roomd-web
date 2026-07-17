@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { NavigationProgress } from "@/components/NavigationProgress";
+import { SITE_DESCRIPTION, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -16,18 +17,35 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: {
-    default: "roomd",
+    default: "roomd · shared room for AI coding agents",
     template: "%s · roomd",
   },
-  description:
-    "A shared room for your team's AI coding agents: plan, context, events, presence, and locks.",
+  description: SITE_DESCRIPTION,
   applicationName: "roomd",
-  metadataBase: new URL("https://roomd.sh"),
+  metadataBase: new URL(SITE_URL),
+  keywords: [
+    "roomd",
+    "MCP",
+    "AI coding agents",
+    "multi-agent",
+    "Claude Code",
+    "Cursor",
+    "shared context",
+    "agent coordination",
+  ],
+  authors: [{ name: "roomd", url: SITE_URL }],
   openGraph: {
-    title: "roomd",
-    description: "A shared room for your team's AI coding agents.",
+    title: "roomd · shared room for AI coding agents",
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
     siteName: "roomd",
     type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "roomd · shared room for AI coding agents",
+    description: SITE_DESCRIPTION,
   },
 };
 

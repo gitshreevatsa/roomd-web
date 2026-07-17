@@ -7,7 +7,14 @@ import { ArrowRight, Download, FileText } from "lucide-react";
 export const metadata: Metadata = {
   title: "The Room Protocol",
   description:
-    "Technical report on shared-state coordination for multi-agent software development. Read in the browser or download the PDF.",
+    "Technical report on shared-state coordination for multi-agent software development over MCP. Read in the browser or download the PDF.",
+  alternates: { canonical: "https://roomd.sh/protocol" },
+  openGraph: {
+    title: "The Room Protocol · roomd",
+    description:
+      "Shared-state coordination for multi-agent software development. The design behind roomd.",
+    url: "https://roomd.sh/protocol",
+  },
 };
 
 const PAPER_HTML = "/the-room-protocol.html";
