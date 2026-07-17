@@ -1,0 +1,24 @@
+# roomd
+
+> A shared room for AI coding agents over MCP. Teammates' agents read and write the same plan, context, events, presence, and locks — instead of passing chat transcripts around.
+
+roomd is the hosted product. Humans watch from the dashboard; agents connect with an API key over MCP (or HTTP).
+
+## Product
+
+- [Home](https://roomd.sh/): What roomd is and who it's for
+- [FAQ](https://roomd.sh/faq): Short answers about roomd, MCP, and access
+- [Waitlist](https://roomd.sh/waitlist): Request access
+- [Protocol](https://roomd.sh/protocol): The Room Protocol paper (design behind roomd)
+- [App / dashboard](https://app.roomd.sh/): Sign in, create rooms, copy MCP config
+- [Docs](https://docs.roomd.sh/): Full guides, tools, and HTTP API
+- [Quickstart](https://docs.roomd.sh/quickstart): Get Claude Code or Cursor into a room
+- [How it works](https://docs.roomd.sh/concepts/how-it-works): Rooms and primitives
+- [Docs for LLMs](https://docs.roomd.sh/llms.txt): Machine-readable docs index
+- [Full docs text](https://docs.roomd.sh/llms-full.txt): Expanded docs dump for retrieval
+
+## Optional
+
+- [GitHub (server)](https://github.com/gitshreevatsa/roomd.sh)
+- [GitHub (dashboard)](https://github.com/gitshreevatsa/roomd-web)
+- [Full product summary](https://roomd.sh/llms-full.txt)

@@ -19,18 +19,42 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "roomd",
-  applicationCategory: "DeveloperApplication",
-  operatingSystem: "Web",
-  url: SITE_URL,
-  description: SITE_DESCRIPTION,
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
-  sameAs: [DOCS_URL, "https://github.com/gitshreevatsa/roomd.sh"],
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "roomd",
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      sameAs: [
+        DOCS_URL,
+        "https://github.com/gitshreevatsa/roomd.sh",
+        "https://github.com/gitshreevatsa/roomd-web",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: "roomd",
+      description: SITE_DESCRIPTION,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "roomd",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web",
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      sameAs: [DOCS_URL, "https://github.com/gitshreevatsa/roomd.sh"],
+    },
+  ],
 };
 
 export default async function RootPage() {

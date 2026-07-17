@@ -87,6 +87,9 @@ function Nav() {
           >
             Docs
           </a>
+          <Link href="/faq" className="transition-colors hover:text-foreground">
+            FAQ
+          </Link>
           <Link href="/protocol" className="transition-colors hover:text-foreground">
             Protocol
           </Link>
@@ -382,9 +385,15 @@ function Footer() {
           <a href={DOCS_URL} className="hover:text-foreground" rel="noopener noreferrer">
             Docs
           </a>
+          <Link href="/faq" className="hover:text-foreground">
+            FAQ
+          </Link>
           <Link href="/protocol" className="hover:text-foreground">
             Protocol
           </Link>
+          <a href="/llms.txt" className="hover:text-foreground">
+            llms.txt
+          </a>
           <Link href="/login" className="hover:text-foreground">
             Sign in
           </Link>

@@ -11,6 +11,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
+      url: `${SITE_URL}/faq`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.85,
+    },
+    {
       url: `${SITE_URL}/protocol`,
       lastModified: now,
       changeFrequency: "monthly",
@@ -21,6 +27,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: "monthly",
       priority: 0.6,
+    },
+    {
+      url: `${SITE_URL}/llms.txt`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.3,
     },
   ];
 }
