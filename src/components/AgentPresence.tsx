@@ -4,7 +4,7 @@ import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/utils";
 import type { AgentPresence as AgentPresenceType, Task } from "@/types";
-import Link from "next/link";
+import { PendingLink } from "@/components/PendingLink";
 
 interface AgentPresenceProps {
   agents: AgentPresenceType[];
@@ -20,9 +20,9 @@ export function AgentPresence({ agents, tasks, roomId, onRefresh, refreshing }: 
       <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground space-y-3">
         <p className="font-medium">No agents have connected yet.</p>
         <p className="text-sm">Follow the setup guide to connect your first agent (Claude Code, Cursor, or any MCP client).</p>
-        <Link href={`/rooms/${roomId}/setup`}>
+        <PendingLink href={`/rooms/${roomId}/setup`}>
           <Button variant="outline" size="sm">Open setup guide</Button>
-        </Link>
+        </PendingLink>
       </div>
     );
   }

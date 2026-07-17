@@ -31,11 +31,14 @@ export default function LoginPage() {
       });
       if (result?.error) {
         setError("Invalid API key. Please try again.");
-      } else {
-        router.push("/dashboard");
-        router.refresh();
+        setLoading(false);
+        return;
       }
-    } finally {
+      // Keep button loading until the next page mounts.
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   }
@@ -52,11 +55,13 @@ export default function LoginPage() {
       });
       if (result?.error) {
         setError("Invalid email or password.");
-      } else {
-        router.push("/dashboard");
-        router.refresh();
+        setLoading(false);
+        return;
       }
-    } finally {
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   }

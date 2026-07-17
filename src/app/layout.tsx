@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { NavigationProgress } from "@/components/NavigationProgress";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <NavigationProgress />
         {children}
       </body>
     </html>

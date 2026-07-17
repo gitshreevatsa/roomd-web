@@ -77,7 +77,7 @@ describe("sendInviteEmail", () => {
     expect(arg.from).toBe("roomd <invites@roomd.sh>");
     expect(arg.text).toContain("sk-secret-123");
     expect(arg.text).toContain("https://app.roomd.sh/login");
-    expect(arg.html).toContain("Welcome to roomd");
+    expect(arg.html).toContain("Your roomd access");
     expect(arg.html).toContain("sk-secret-123");
     expect(arg.html).toContain("https://app.roomd.sh/login");
     expect(arg.html).toContain("#1a9e48");

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { DeleteAccountButton } from "@/components/DeleteAccountButton";
+import { AppNav } from "@/components/AppNav";
 
 async function deleteAccountAction() {
   "use server";
@@ -47,19 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href="/dashboard" className="font-mono text-sm font-semibold tracking-tight">
               roomd
             </Link>
-            <nav className="flex items-center gap-0.5 sm:gap-1">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="sm" className="px-2 sm:px-3">Dashboard</Button>
-              </Link>
-              <Link href="/admin">
-                <Button variant="ghost" size="sm" className="px-2 sm:px-3">Admin</Button>
-              </Link>
-              {owner && (
-                <Link href="/owner">
-                  <Button variant="ghost" size="sm" className="px-2 sm:px-3">Owner</Button>
-                </Link>
-              )}
-            </nav>
+            <AppNav showOwner={owner} />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-[160px]">

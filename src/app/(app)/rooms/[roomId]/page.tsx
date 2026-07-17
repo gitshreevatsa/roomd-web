@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { AgentPresence } from "@/components/AgentPresence";
 import { EventFeed } from "@/components/EventFeed";
 import { ContextGrid } from "@/components/ContextGrid";
 import { CopyButton } from "@/components/CopyButton";
+import { PendingLink } from "@/components/PendingLink";
 import { Settings, BookOpen, UserPlus } from "lucide-react";
 import type { Plan, ContextEntry, Event, AgentPresence as AgentPresenceType } from "@/types";
 
@@ -91,28 +91,32 @@ export default function RoomPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Link href={`/rooms/${roomId}/setup`}>
+          <PendingLink href={`/rooms/${roomId}/setup`}>
             <Button variant="outline" size="sm" className="gap-1.5">
               <BookOpen className="h-4 w-4" />
               <span className="hidden sm:inline">Setup guide</span>
             </Button>
-          </Link>
-          <Link href="/admin">
+          </PendingLink>
+          <PendingLink href="/admin">
             <Button variant="outline" size="sm" className="gap-1.5">
               <UserPlus className="h-4 w-4" />
               <span className="hidden sm:inline">Invite</span>
             </Button>
-          </Link>
-          <Link href="/admin">
+          </PendingLink>
+          <PendingLink href="/admin">
             <Button variant="outline" size="icon" className="h-9 w-9">
               <Settings className="h-4 w-4" />
             </Button>
-          </Link>
+          </PendingLink>
         </div>
       </div>
 
       {loading ? (
-        <div className="py-16 text-center text-muted-foreground text-sm">Loading…</div>
+        <div className="space-y-3 roomd-page-enter">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-10 animate-pulse rounded-md bg-muted" />
+          ))}
+        </div>
       ) : (
         <Tabs defaultValue="tasks">
           <TabsList>

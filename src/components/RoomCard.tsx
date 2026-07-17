@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CopyButton } from "@/components/CopyButton";
+import { PendingLink } from "@/components/PendingLink";
 import { formatRelativeTime } from "@/lib/utils";
 import type { RoomSummary } from "@/types";
 
@@ -19,8 +19,8 @@ export function RoomCard({ room }: RoomCardProps) {
       : 0;
 
   return (
-    <Link href={`/rooms/${room.roomId}`} className="block">
-      <Card className="h-full cursor-pointer transition-all hover:border-primary/40 hover:shadow-md">
+    <PendingLink href={`/rooms/${room.roomId}`} className="block">
+      <Card className="h-full cursor-pointer transition-all hover:border-primary/40 hover:shadow-md active:scale-[0.99]">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <CardTitle className="text-lg">{room.name}</CardTitle>
@@ -69,6 +69,6 @@ export function RoomCard({ room }: RoomCardProps) {
           </p>
         </CardContent>
       </Card>
-    </Link>
+    </PendingLink>
   );
 }

@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getServerIdentity } from "@/lib/session";
 import { getRoomSummaries } from "@/lib/rooms";
 import { Button } from "@/components/ui/button";
 import { RoomCard } from "@/components/RoomCard";
+import { PendingLink } from "@/components/PendingLink";
 import { Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -23,12 +23,12 @@ export default async function DashboardPage() {
             {rooms.length} room{rooms.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <Link href="/rooms/new">
+        <PendingLink href="/rooms/new">
           <Button>
             <Plus className="h-4 w-4" />
             New room
           </Button>
-        </Link>
+        </PendingLink>
       </div>
 
       {rooms.length === 0 ? (
@@ -40,12 +40,12 @@ export default async function DashboardPage() {
               Create one, then point Claude or Cursor at it with your MCP config.
             </p>
           </div>
-          <Link href="/rooms/new">
+          <PendingLink href="/rooms/new">
             <Button size="lg">
               <Plus className="h-4 w-4" />
               Create your first room
             </Button>
-          </Link>
+          </PendingLink>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

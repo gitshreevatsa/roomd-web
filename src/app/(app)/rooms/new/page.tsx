@@ -67,10 +67,10 @@ export default function NewRoomPage() {
         throw new Error(data.error ?? "Failed to create room");
       }
       const { roomId: created } = await res.json();
+      // Keep the button busy until setup mounts.
       router.push(`/rooms/${created}/setup`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
-    } finally {
       setLoading(false);
     }
   }
