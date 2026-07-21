@@ -18,9 +18,13 @@ export default async function SetupPage({ params }: Props) {
   if (!identity) redirect("/login");
 
   const meta = await getRoomMeta(params.roomId);
-  if (!meta) redirect("/dashboard");
+  if (!meta || meta.createdBy !== identity.teamId) redirect("/dashboard");
 
-  const collabMcpUrl = process.env.ROOMD_URL ?? "http://localhost:3000";
+  // Public MCP URL only — never an internal service hostname.
+  const collabMcpUrl =
+    process.env.NEXT_PUBLIC_ROOMD_URL ??
+    process.env.ROOMD_URL ??
+    "http://localhost:3000";
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">

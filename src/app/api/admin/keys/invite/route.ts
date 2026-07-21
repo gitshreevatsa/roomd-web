@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getServerIdentity } from "@/lib/session";
 import { createAdminKey } from "@/lib/roomd";
 import { sendInviteEmail } from "@/lib/mail";
+import { track, captureError } from "@/lib/telemetry";
 
 const schema = z.object({ email: z.string().trim().email().max(254) });
 
@@ -33,9 +34,14 @@ export async function POST(req: NextRequest) {
       loginUrl,
       context: "team",
     });
+    track("teammate_invite_sent", {
+      userId: identity.userId,
+      teamId: identity.teamId,
+      emailed: mail.sent,
+    });
     return NextResponse.json({ email, secret: key.secret, emailed: mail.sent });
   } catch (err) {
-    console.error("[keys:invite]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "keys:invite", userId: identity.userId });
     return NextResponse.json({ error: "Failed to invite teammate" }, { status: 500 });
   }
 }

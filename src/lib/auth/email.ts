@@ -16,6 +16,7 @@ export const emailProvider = Credentials({
 
     const user = await getUserByEmail(email.toLowerCase().trim());
     if (!user?.passwordHash) return null;
+    if (user.disabledAt) return null;
 
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) return null;

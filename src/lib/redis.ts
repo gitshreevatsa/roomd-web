@@ -248,6 +248,8 @@ export interface AccessDraft {
   teamId: string;
   keyId: string;
   keyHint: string;
+  /** sha256 of the minted secret — confirm must present the matching secret. */
+  secretHash?: string;
   createdAt: string;
 }
 

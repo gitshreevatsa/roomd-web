@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "crypto";
 import { z } from "zod";
 import { getServerIdentity, isOperator } from "@/lib/session";
 import {
@@ -24,6 +25,7 @@ import { provisionTeamKey, revokeAdminKey, revokeAllTeamKeys } from "@/lib/roomd
 import { waitlistTeamId } from "@/lib/teams";
 import { sendInviteEmail } from "@/lib/mail";
 import { buildInviteEmailHtml } from "@/lib/email/invite-template";
+import { track, captureError } from "@/lib/telemetry";
 import type { OrgInviteEntry } from "@/types";
 
 /**
@@ -90,6 +92,10 @@ function masterKey() {
   return process.env.ROOMD_MASTER_KEY;
 }
 
+function hashSecret(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex");
+}
+
 export async function GET() {
   const identity = await getServerIdentity();
   if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -148,6 +154,7 @@ async function prepare(email: string, source: AccessSource, mk: string) {
       teamId: key.teamId,
       keyId: key.keyId,
       keyHint: key.secret.slice(-4),
+      secretHash: hashSecret(key.secret),
       createdAt: new Date().toISOString(),
     };
     await saveAccessDraft(draft);
@@ -203,6 +210,20 @@ async function confirm(
       );
     }
 
+    if (draft.secretHash && draft.secretHash !== hashSecret(secret)) {
+      return NextResponse.json(
+        { error: "Secret does not match the prepared invite" },
+        { status: 400 },
+      );
+    }
+    // Legacy drafts without secretHash: require last-4 hint match.
+    if (!draft.secretHash && !secret.endsWith(draft.keyHint)) {
+      return NextResponse.json(
+        { error: "Secret does not match the prepared invite" },
+        { status: 400 },
+      );
+    }
+
     let emailed = false;
     let reason: string | undefined;
     if (delivery === "email") {
@@ -237,9 +258,15 @@ async function confirm(
     }
 
     await deleteAccessDraft(email);
+    track("access_invite_confirmed", {
+      delivery,
+      emailed,
+      source: draft.source,
+      teamId: draft.teamId,
+    });
     return NextResponse.json({ email, emailed, delivery, confirmed: true });
   } catch (err) {
-    console.error("[access:confirm]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "access:confirm" });
     return NextResponse.json({ error: "Failed to confirm invite" }, { status: 500 });
   }
 }

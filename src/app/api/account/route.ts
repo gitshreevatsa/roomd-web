@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerIdentity } from "@/lib/session";
 import { deleteUser, getUserById } from "@/lib/redis";
 import { revokeAllTeamKeys } from "@/lib/roomd";
+import { track, captureError } from "@/lib/telemetry";
 
 /**
  * Self-service account erasure (GDPR).
@@ -26,10 +27,11 @@ export async function DELETE() {
     try {
       await revokeAllTeamKeys(user.teamId, master);
     } catch (err) {
-      console.error("[account:delete:keys]", err instanceof Error ? err.message : err);
+      captureError(err, { route: "account:delete:keys", userId: user.id });
     }
   }
 
   await deleteUser(user.id);
+  track("account_deleted", { userId: user.id, teamId: user.teamId });
   return NextResponse.json({ ok: true, deleted: true });
 }

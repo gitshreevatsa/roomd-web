@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { NavigationProgress } from "@/components/NavigationProgress";
+import { AnalyticsProviders } from "@/components/AnalyticsProviders";
 import { SITE_DESCRIPTION, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
@@ -71,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
         <NavigationProgress />
-        {children}
+        <AnalyticsProviders>{children}</AnalyticsProviders>
       </body>
     </html>
   );

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DOCS_URL } from "@/lib/site";
+import { trackClient } from "@/lib/analytics-client";
 
 const AUTH_MODE = process.env.NEXT_PUBLIC_AUTH_MODE ?? "apikey";
 
@@ -31,14 +32,17 @@ export default function LoginPage() {
         redirect: false,
       });
       if (result?.error) {
+        trackClient("login_fail", { method: "apikey" });
         setError("Invalid API key. Please try again.");
         setLoading(false);
         return;
       }
+      trackClient("login_success", { method: "apikey" });
       // Keep button loading until the next page mounts.
       router.push("/dashboard");
       router.refresh();
     } catch {
+      trackClient("login_fail", { method: "apikey" });
       setError("Something went wrong. Please try again.");
       setLoading(false);
     }
@@ -55,13 +59,16 @@ export default function LoginPage() {
         redirect: false,
       });
       if (result?.error) {
+        trackClient("login_fail", { method: "email" });
         setError("Invalid email or password.");
         setLoading(false);
         return;
       }
+      trackClient("login_success", { method: "email" });
       router.push("/dashboard");
       router.refresh();
     } catch {
+      trackClient("login_fail", { method: "email" });
       setError("Something went wrong. Please try again.");
       setLoading(false);
     }
@@ -185,7 +192,10 @@ export default function LoginPage() {
                       <Button
                         variant="outline"
                         className="w-full"
-                        onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+                        onClick={() => {
+                          trackClient("login_oauth_start", { method: "google" });
+                          void signIn("google", { callbackUrl: "/dashboard" });
+                        }}
                       >
                         Continue with Google
                       </Button>
@@ -194,7 +204,10 @@ export default function LoginPage() {
                       <Button
                         variant="outline"
                         className="w-full"
-                        onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+                        onClick={() => {
+                          trackClient("login_oauth_start", { method: "github" });
+                          void signIn("github", { callbackUrl: "/dashboard" });
+                        }}
                       >
                         Continue with GitHub
                       </Button>

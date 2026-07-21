@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createUser, getUserByEmail } from "@/lib/redis";
+import {
+  createUser,
+  getUserByEmail,
+  getWaitlistEntry,
+  getOrgInvite,
+} from "@/lib/redis";
 import { provisionTeamKey } from "@/lib/roomd";
 import { hashPassword } from "@/lib/password";
 import { emailTeamId } from "@/lib/teams";
 import { AUTH_MODE } from "@/lib/auth";
+import { checkWebRateLimit, clientIp, rateLimitBucket } from "@/lib/ratelimit";
+import { track, captureError } from "@/lib/telemetry";
 
 const schema = z.object({
   name: z.string().trim().min(1).max(64).optional(),
@@ -15,16 +22,21 @@ const schema = z.object({
 /**
  * POST /api/auth/register
  *
- * Creates an email/password account and provisions an isolated roomd team
- * for it. Only reachable when email auth is turned on, so an invite-only
- * deployment cannot be signed up for through a route the login page hides.
+ * Creates an email/password account and provisions an isolated roomd team.
+ * Invite-only unless ALLOW_OPEN_SIGNUP=true.
  */
 export async function POST(req: NextRequest) {
   if (AUTH_MODE === "apikey") {
     return NextResponse.json(
       { error: "Registration is closed. This deployment is invite only." },
-      { status: 403 }
+      { status: 403 },
     );
+  }
+
+  const ip = clientIp(req);
+  const limited = await checkWebRateLimit(rateLimitBucket("register", ip), 5);
+  if (!limited.allowed) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
   let parsed: z.infer<typeof schema>;
@@ -39,9 +51,22 @@ export async function POST(req: NextRequest) {
 
   const email = parsed.email.toLowerCase();
 
+  if (process.env.ALLOW_OPEN_SIGNUP !== "true") {
+    const wait = await getWaitlistEntry(email);
+    const org = await getOrgInvite(email);
+    const invited =
+      wait?.status === "invited" ||
+      (org && (org.status === "delivered" || org.status === "pending_delivery"));
+    if (!invited) {
+      return NextResponse.json(
+        { error: "Registration requires an invite" },
+        { status: 403 },
+      );
+    }
+  }
+
   const existing = await getUserByEmail(email);
   if (existing) {
-    // Do not reveal whether an address is registered.
     return NextResponse.json({ error: "Could not create account" }, { status: 409 });
   }
 
@@ -62,9 +87,10 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
+    track("register_success", { teamId: keyData.teamId });
     return NextResponse.json({ ok: true }, { status: 201 });
   } catch (err) {
-    console.error("[register]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "register" });
     return NextResponse.json({ error: "Could not create account" }, { status: 500 });
   }
 }

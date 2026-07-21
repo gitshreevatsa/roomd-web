@@ -43,7 +43,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session?.user) redirect("/login");
 
   const identity = await getServerIdentity();
-  const owner = identity ? isOperator(identity) : false;
+  if (!identity) redirect("/login");
+  const owner = isOperator(identity);
 
   return (
     <div className="min-h-screen flex flex-col">

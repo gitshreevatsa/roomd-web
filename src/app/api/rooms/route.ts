@@ -4,6 +4,7 @@ import { createRoom } from "@/lib/redis";
 import { getRoomSummaries } from "@/lib/rooms";
 import { claimRoom } from "@/lib/roomd";
 import { slugify } from "@/lib/utils";
+import { track, captureError } from "@/lib/telemetry";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
@@ -58,9 +59,10 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
+    track("room_created", { userId: identity.userId, teamId: identity.teamId, roomId });
     return NextResponse.json({ roomId, name }, { status: 201 });
   } catch (err) {
-    console.error("[rooms:create]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "rooms:create", userId: identity.userId });
     return NextResponse.json({ error: "Failed to create room" }, { status: 500 });
   }
 }
