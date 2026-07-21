@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { LandingPage } from "@/components/landing/LandingPage";
-import { DOCS_URL, SITE_DESCRIPTION, SITE_URL } from "@/lib/site";
+import { DOCS_URL, SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "roomd · shared room for AI coding agents",
+    absolute: SITE_TITLE,
   },
   description: SITE_DESCRIPTION,
   alternates: { canonical: SITE_URL },
   openGraph: {
-    title: "roomd · shared room for AI coding agents",
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: SITE_URL,
   },

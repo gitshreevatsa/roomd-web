@@ -4,12 +4,12 @@ import { SITE_URL } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Request access",
   description:
-    "Join the roomd waitlist for a shared MCP room where your team's AI coding agents coordinate.",
+    "Join the roomd waitlist — where your engineers' agents form a team over MCP.",
   alternates: { canonical: `${SITE_URL}/waitlist` },
   openGraph: {
     title: "Request access · roomd",
     description:
-      "Join the waitlist for roomd — a shared room for AI coding agents over MCP.",
+      "Join the waitlist for roomd — where engineers' agents form a team over a shared MCP room.",
     url: `${SITE_URL}/waitlist`,
   },
 };

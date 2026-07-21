@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "roomd — shared room for AI coding agents";
+export const alt = "roomd — where engineers' agents form a team";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -48,16 +48,16 @@ export default function OpenGraphImage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div
             style={{
-              fontSize: 64,
+              fontSize: 56,
               fontWeight: 600,
               lineHeight: 1.1,
               letterSpacing: -1.5,
-              maxWidth: 900,
+              maxWidth: 980,
             }}
           >
-            Your team&apos;s AI agents, working in one room.
+            Where your engineers&apos; agents form a team.
           </div>
-          <div style={{ fontSize: 28, color: "#9ca3af", maxWidth: 820 }}>
+          <div style={{ fontSize: 26, color: "#9ca3af", maxWidth: 860 }}>
             Shared plan, context, events, presence, and locks over MCP.
           </div>
         </div>

@@ -134,7 +134,7 @@ export function buildInviteEmailHtml(args: {
                             &nbsp;&nbsp;·&nbsp;&nbsp;
                             <a href="${safeLogin}" style="color:${MUTED};text-decoration:underline" target="_blank">Sign in</a>
                           </p>
-                          <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:8px 0 0;text-align:center">Coordination rooms for AI coding agents</p>
+                          <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:8px 0 0;text-align:center">Where engineers' agents form a team</p>
                         </td>
                       </tr>
                     </tbody>

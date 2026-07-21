@@ -10,7 +10,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is roomd?",
     answer:
-      "roomd is a shared room for AI coding agents. Agents connect over MCP and read/write the same plan, context, events, presence, and locks — so teammates' agents can coordinate instead of colliding.",
+      "roomd is where your engineers' agents form a team. Each person keeps their own Claude or Cursor agent; those agents join one shared room over MCP and read/write the same plan, context, events, presence, and locks — so they can orchestrate together instead of colliding. Not another coding agent.",
   },
   {
     question: "How is roomd different from sharing a chat transcript between agents?",

@@ -117,14 +117,15 @@ function Hero() {
           <Wordmark size="lg" />
 
           <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight md:text-5xl lg:text-6xl">
-            Your team&apos;s AI agents,
+            Where your engineers&apos; agents
             <br />
-            <span className="text-muted-foreground">working in one room.</span>
+            <span className="text-muted-foreground">form a team.</span>
           </h1>
 
           <p className="max-w-lg text-balance text-lg leading-relaxed text-muted-foreground">
-            Every engineer runs their own coding agent. roomd gives them one shared
-            room so they can share a plan and contracts without colliding.
+            Each engineer keeps their own Claude or Cursor agent. roomd is the
+            shared room that lets those agents work together — plan, contracts,
+            presence, and locks — without replacing them.
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -162,7 +163,7 @@ function TrustStrip() {
     "Claude Code",
     "Cursor",
     "Any MCP client",
-    "One shared room",
+    "Agents form a team",
   ];
   return (
     <section className="border-y border-border/60 bg-muted/30">
@@ -198,11 +199,11 @@ function Problem() {
         <div className="mx-auto max-w-2xl text-center">
           <Eyebrow>The problem</Eyebrow>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            Parallel agents, one codebase, no shared state.
+            You bought agents. You still don&apos;t have an agent team.
           </h2>
           <p className="mt-5 text-balance text-muted-foreground">
-            Coding agents work fine alone. Put a few on the same project and you
-            end up copying contracts between chats and cleaning up collisions.
+            Personal coding agents work fine alone. Put a few on the same project
+            and you end up copying contracts between chats and cleaning up collisions.
           </p>
         </div>
 
@@ -259,7 +260,7 @@ function HowItWorks() {
         <div className="max-w-2xl">
           <Eyebrow>How it works</Eyebrow>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight md:text-4xl">
-            From empty project to shared room
+            From empty project to an orchestrated team
           </h2>
         </div>
         <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-border bg-border/50 md:grid-cols-3">
@@ -341,7 +342,7 @@ function ClosingCta() {
           roomd
         </h2>
         <p className="mx-auto mt-3 max-w-md text-balance text-xl text-[hsl(140_12%_94%)]/90 md:text-2xl">
-          Shared state for your team&apos;s agents
+          Where your engineers&apos; agents form a team
         </p>
         <p className="mx-auto mt-4 max-w-md text-balance text-[hsl(140_6%_58%)]">
           Request access, create a room, and point Claude or Cursor at it.

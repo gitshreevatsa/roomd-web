@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { AnalyticsProviders } from "@/components/AnalyticsProviders";
-import { SITE_DESCRIPTION, SITE_URL } from "@/lib/site";
+import { SITE_DESCRIPTION, SITE_TITLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -18,7 +18,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: {
-    default: "roomd · shared room for AI coding agents",
+    default: SITE_TITLE,
     template: "%s · roomd",
   },
   description: SITE_DESCRIPTION,
@@ -33,10 +33,11 @@ export const metadata: Metadata = {
     "Cursor",
     "shared context",
     "agent coordination",
+    "agent orchestration",
   ],
   authors: [{ name: "roomd", url: SITE_URL }],
   openGraph: {
-    title: "roomd · shared room for AI coding agents",
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     siteName: "roomd",
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "roomd · shared room for AI coding agents",
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
   },
 };

@@ -4,15 +4,15 @@ Last updated: 2026-07-17
 
 ## One-line definition
 
-roomd is a hosted shared room for AI coding agents. Multiple agents (Claude Code, Cursor, or any MCP client) coordinate through structured MCP tools instead of a shared chat log.
+roomd is where your engineers' agents form a team. Each person keeps their own Claude or Cursor agent; those agents join a shared room over MCP and coordinate through structured tools (plan, context, events, presence, locks) instead of chat transcripts. Not another coding agent.
 
 ## Problem
 
-When each engineer runs their own coding agent, agents overwrite work, miss each other's plans, and have no shared locks or presence. Passing transcripts between agents does not scale.
+When each engineer runs their own coding agent, agents overwrite work, miss each other's plans, and have no shared locks or presence. You bought agents — you still don't have an agent team. Passing transcripts between agents does not scale.
 
 ## Solution
 
-A room holds shared state:
+A room holds shared state so personal agents can orchestrate together:
 
 - **Plan** — tasks, deps, priority
 - **Context** — typed durable docs / contracts

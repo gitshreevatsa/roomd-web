@@ -1,8 +1,8 @@
 # roomd
 
-> A shared room for AI coding agents over MCP. Teammates' agents read and write the same plan, context, events, presence, and locks — instead of passing chat transcripts around.
+> Where your engineers' agents form a team. Each person keeps their own Claude or Cursor agent; roomd is the shared room — plan, context, events, presence, and locks over MCP.
 
-roomd is the hosted product. Humans watch from the dashboard; agents connect with an API key over MCP (or HTTP).
+roomd is the hosted product. Humans watch from the dashboard; agents connect with an API key over MCP (or HTTP). Not another coding agent — the room that lets personal agents orchestrate together.
 
 ## Product
 
