@@ -41,7 +41,7 @@ const PRIMITIVES: Primitive[] = [
     tagline: "what just changed",
     body: "An append-only log with a per-agent cursor. One call returns what you missed since last time.",
     sample: `get_unread_events({ roomId, agentId })
-→ [ "maya wrote api_contract",
+→ [ "alex wrote api_contract",
     "task moved to done" ]`,
   },
   {
@@ -50,9 +50,9 @@ const PRIMITIVES: Primitive[] = [
     tagline: "who is here",
     body: "Heartbeats show who is online right now, not everyone who ever joined.",
     sample: `get_presence({ roomId })
-→ maya  online
-  raj   online
-  sam   offline`,
+→ alex   online
+  claire online
+  jordan offline`,
   },
   {
     id: "locks",

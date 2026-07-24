@@ -12,22 +12,22 @@ interface Beat {
   kind: Kind;
 }
 
-type Who = "maya" | "raj" | "sam";
+type Who = "alex" | "claire" | "jordan";
 
 const PEOPLE: { id: Who; role: string; tint: string }[] = [
-  { id: "maya", role: "backend", tint: "bg-violet-500" },
-  { id: "raj", role: "frontend", tint: "bg-sky-500" },
-  { id: "sam", role: "qa", tint: "bg-amber-500" },
+  { id: "alex", role: "backend", tint: "bg-violet-500" },
+  { id: "claire", role: "frontend", tint: "bg-sky-500" },
+  { id: "jordan", role: "qa", tint: "bg-amber-500" },
 ];
 
 const SCRIPT: Beat[] = [
-  { who: "maya", text: "joined the room", kind: "presence" },
-  { who: "maya", text: "wrote api_contract · auth", kind: "context" },
-  { who: "raj", text: "joined the room", kind: "presence" },
-  { who: "raj", text: "reading maya's contract", kind: "read" },
-  { who: "sam", text: "blocked · needs /me endpoint", kind: "blocked" },
-  { who: "maya", text: "added /me → contract v1.1", kind: "context" },
-  { who: "raj", text: "login screen → done", kind: "done" },
+  { who: "alex", text: "joined the room", kind: "presence" },
+  { who: "alex", text: "wrote api_contract · auth", kind: "context" },
+  { who: "claire", text: "joined the room", kind: "presence" },
+  { who: "claire", text: "reading alex's contract", kind: "read" },
+  { who: "jordan", text: "blocked · needs /me endpoint", kind: "blocked" },
+  { who: "alex", text: "added /me → contract v1.1", kind: "context" },
+  { who: "claire", text: "login screen → done", kind: "done" },
 ];
 
 const KIND_ACCENT: Record<Kind, string> = {
@@ -67,7 +67,7 @@ export function RoomDemo() {
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
     if (reduce) {
-      setOnline(new Set<Who>(["maya", "raj", "sam"]));
+      setOnline(new Set<Who>(["alex", "claire", "jordan"]));
       setDone(1);
       setFeed(
         [SCRIPT[3], SCRIPT[4], SCRIPT[5], SCRIPT[6]].map((b, i) => ({ ...b, id: i }))
