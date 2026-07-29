@@ -24,11 +24,10 @@ export interface PreparedInvite {
   loginUrl: string;
 }
 
-type Phase = "ready" | "sending" | "sent" | "copied";
-
 /**
- * Review the invite email, then deliver via Send or Copy.
- * Closing without Send/Copy abandons the draft and revokes the minted key.
+ * Review the invite email, then deliver via Send and/or Copy.
+ * Closing without either abandons the draft and revokes the minted key.
+ * Copy then Send is allowed — the draft stays until email succeeds or close.
  */
 export function AcceptInviteDialog({
   invite,
@@ -39,19 +38,27 @@ export function AcceptInviteDialog({
   onClose: () => void;
   onDelivered?: () => void;
 }) {
-  const [phase, setPhase] = useState<Phase>("ready");
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [emailed, setEmailed] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const delivered = useRef(false);
+  const inFlight = useRef(false);
 
   useEffect(() => {
-    setPhase("ready");
+    setBusy(false);
+    setCopied(false);
+    setEmailed(false);
     setSendError(null);
-    delivered.current = false;
+    inFlight.current = false;
   }, [invite?.email, invite?.secret]);
 
   async function confirm(delivery: "email" | "copy") {
-    if (!invite) return;
-    if (delivery === "email") setPhase("sending");
+    if (!invite || inFlight.current) return;
+    if (delivery === "copy" && copied) return;
+    if (delivery === "email" && emailed) return;
+
+    inFlight.current = true;
+    setBusy(true);
     setSendError(null);
     try {
       const res = await fetch("/api/admin/access", {
@@ -78,20 +85,25 @@ export function AcceptInviteDialog({
               ? "Email did not send. Try Copy key instead."
               : "Could not confirm invite."),
         );
-        setPhase("ready");
         return;
       }
-      delivered.current = true;
-      setPhase(delivery === "email" ? "sent" : "copied");
+      if (delivery === "email") setEmailed(true);
+      else setCopied(true);
       onDelivered?.();
     } catch {
       setSendError("Something went wrong. Try again.");
-      setPhase("ready");
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
     }
   }
 
-  async function abandonIfNeeded() {
-    if (!invite || delivered.current) return;
+  async function cleanupOnClose() {
+    if (!invite || inFlight.current) return;
+    // Email confirm already deleted the draft. Skip if we only emailed.
+    if (emailed) return;
+    // No delivery → revoke key. Copy-only → draft has confirmedAt, so abandon
+    // only clears the leftover draft (does not revoke).
     try {
       await fetch("/api/admin/access", {
         method: "POST",
@@ -105,12 +117,16 @@ export function AcceptInviteDialog({
 
   async function handleOpenChange(open: boolean) {
     if (!open) {
-      await abandonIfNeeded();
-      setPhase("ready");
+      await cleanupOnClose();
+      setBusy(false);
+      setCopied(false);
+      setEmailed(false);
       setSendError(null);
       onClose();
     }
   }
+
+  const done = copied || emailed;
 
   return (
     <Dialog open={!!invite} onOpenChange={(o) => void handleOpenChange(o)}>
@@ -120,16 +136,20 @@ export function AcceptInviteDialog({
             {invite?.source === "waitlist" ? "Accept" : "Invite"} {invite?.email}
           </DialogTitle>
           <DialogDescription>
-            Preview the email, then send it or copy the key. Closing without either cancels
-            the invite.
+            Preview the email, then send it and/or copy the key. You can do both.
+            Closing without either cancels the invite.
           </DialogDescription>
         </DialogHeader>
 
         {invite && (
           <div className="space-y-4">
-            {(phase === "sent" || phase === "copied") && (
+            {done && (
               <Badge variant="green" className="text-xs">
-                {phase === "sent" ? "Email sent" : "Key copied. Share it with them."}
+                {emailed && copied
+                  ? "Key copied and email sent"
+                  : emailed
+                    ? "Email sent"
+                    : "Key copied. You can still send the email."}
               </Badge>
             )}
 
@@ -158,30 +178,30 @@ export function AcceptInviteDialog({
 
         <DialogFooter className="gap-2 sm:justify-between">
           <Button variant="ghost" onClick={() => void handleOpenChange(false)}>
-            {phase === "sent" || phase === "copied" ? "Done" : "Cancel"}
+            {done ? "Done" : "Cancel"}
           </Button>
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
               className="gap-1.5"
-              disabled={!invite || phase === "sending" || phase === "sent" || phase === "copied"}
+              disabled={!invite || busy || copied}
               onClick={() => void confirm("copy")}
             >
-              Copy key &amp; confirm
+              {copied ? "Key copied" : "Copy key & confirm"}
             </Button>
             <CopyButton text={invite?.text ?? ""} label="Copy message" />
             <Button
               className="gap-1.5"
-              disabled={!invite || phase === "sending" || phase === "sent" || phase === "copied"}
+              disabled={!invite || busy || emailed}
               onClick={() => void confirm("email")}
             >
-              {phase === "sending" ? (
+              {busy && !emailed ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              {phase === "sent" ? "Sent" : "Send email"}
+              {emailed ? "Sent" : "Send email"}
             </Button>
           </div>
         </DialogFooter>

@@ -38,7 +38,7 @@ export default function RoomPage() {
       try {
         const [roomRes, metaRes] = await Promise.all([
           fetch(`/api/rooms/${roomId}`, { cache: "no-store" }),
-          fetch(`/api/rooms`),
+          fetch(`/api/rooms`, { cache: "no-store" }),
         ]);
 
         if (roomRes.ok) {

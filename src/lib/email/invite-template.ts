@@ -20,7 +20,7 @@ export function buildInviteEmailHtml(args: {
 }): string {
   const { key, loginUrl, who, scope } = args;
   const preheader =
-    args.preheader ?? "Your roomd access key. Sign in and create a room.";
+    args.preheader ?? "Transactional access key for your roomd workspace.";
   const site = "https://roomd.sh";
   const safeKey = escapeHtml(key);
   const safeLogin = escapeHtml(loginUrl);
@@ -33,7 +33,7 @@ export function buildInviteEmailHtml(args: {
   <meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/>
   <meta name="x-apple-disable-message-reformatting"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Your roomd invite</title>
+  <title>roomd access key</title>
 </head>
 <body style="background-color:${BG};margin:0;padding:0">
   <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">

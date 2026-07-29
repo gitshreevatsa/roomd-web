@@ -6,19 +6,22 @@ import { SetupSnippet } from "@/components/SetupSnippet";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 interface Props {
   params: { roomId: string };
+  searchParams?: { name?: string };
 }
 
-export default async function SetupPage({ params }: Props) {
-  // This page shows the operator their own team key so they can paste it into
-  // Claude Code, Cursor, or another MCP client. It is the one place the key is
-  // rendered on purpose.
+export default async function SetupPage({ params, searchParams }: Props) {
+  // Shows the caller's own team key so they can paste it into Claude Code,
+  // Cursor, or another MCP client. Any signed-in teammate may open this —
+  // roomd enforces room access when the agent connects.
   const identity = await getServerIdentity();
   if (!identity) redirect("/login");
 
   const meta = await getRoomMeta(params.roomId);
-  if (!meta || meta.createdBy !== identity.teamId) redirect("/dashboard");
+  const roomName = meta?.name ?? searchParams?.name ?? params.roomId;
 
   // Public MCP URL only — never an internal service hostname.
   const collabMcpUrl =
@@ -29,7 +32,7 @@ export default async function SetupPage({ params }: Props) {
   return (
     <div className="max-w-2xl mx-auto space-y-8">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Set up {meta.name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Set up {roomName}</h1>
         <p className="text-sm text-muted-foreground">
           Room ID:{" "}
           <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">

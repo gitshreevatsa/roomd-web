@@ -235,29 +235,49 @@ async function confirm(
       }
     }
 
-    if (draft.source === "waitlist") {
-      await markWaitlistInvited(email, draft.teamId, draft.keyId);
+    // First successful delivery marks waitlist/org as issued. Later delivery
+    // (copy then email, or email then copy) reuses the same draft.
+    if (!draft.confirmedAt) {
+      if (draft.source === "waitlist") {
+        await markWaitlistInvited(email, draft.teamId, draft.keyId);
+      } else {
+        const existing = (await getOrgInvite(email)) ?? {
+          email,
+          status: "pending_delivery" as const,
+          teamId: draft.teamId,
+          keyId: draft.keyId,
+          keyHint: draft.keyHint,
+          createdAt: draft.createdAt,
+        };
+        await upsertOrgInvite({
+          ...existing,
+          status: "delivered",
+          deliveredAt: new Date().toISOString(),
+          delivery,
+          teamId: draft.teamId,
+          keyId: draft.keyId,
+          keyHint: draft.keyHint,
+        });
+      }
+    } else if (draft.source === "direct" && delivery === "email") {
+      const existing = await getOrgInvite(email);
+      if (existing) {
+        await upsertOrgInvite({ ...existing, delivery: "email" });
+      }
+    }
+
+    // Keep the draft after copy so Send email still works in the same dialog.
+    // Email is the last hop — clear the draft once it succeeds.
+    if (delivery === "email") {
+      await deleteAccessDraft(email);
     } else {
-      const existing = (await getOrgInvite(email)) ?? {
-        email,
-        status: "pending_delivery" as const,
-        teamId: draft.teamId,
-        keyId: draft.keyId,
-        keyHint: draft.keyHint,
-        createdAt: draft.createdAt,
-      };
-      await upsertOrgInvite({
-        ...existing,
-        status: "delivered",
-        deliveredAt: new Date().toISOString(),
-        delivery,
-        teamId: draft.teamId,
-        keyId: draft.keyId,
-        keyHint: draft.keyHint,
+      await saveAccessDraft({
+        ...draft,
+        confirmedAt: draft.confirmedAt ?? new Date().toISOString(),
+        delivery: "copy",
       });
     }
 
-    await deleteAccessDraft(email);
     track("access_invite_confirmed", {
       delivery,
       emailed,
@@ -275,10 +295,13 @@ async function abandon(email: string, mk: string) {
   try {
     const draft = await getAccessDraft(email);
     if (draft) {
-      try {
-        await revokeAdminKey(draft.keyId, mk);
-      } catch (err) {
-        console.error("[access:abandon:revoke]", err instanceof Error ? err.message : err);
+      // Already delivered via Copy — only drop the draft, keep the key.
+      if (!draft.confirmedAt) {
+        try {
+          await revokeAdminKey(draft.keyId, mk);
+        } catch (err) {
+          console.error("[access:abandon:revoke]", err instanceof Error ? err.message : err);
+        }
       }
       await deleteAccessDraft(email);
     }

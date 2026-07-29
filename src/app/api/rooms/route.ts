@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getServerIdentity } from "@/lib/session";
 import { createRoom } from "@/lib/redis";
 import { getRoomSummaries } from "@/lib/rooms";
@@ -58,6 +59,11 @@ export async function POST(req: NextRequest) {
       createdBy: identity.userId,
       createdAt: new Date().toISOString(),
     });
+
+    // Soft navigations can serve a stale RSC dashboard until refresh.
+    revalidatePath("/dashboard");
+    revalidatePath(`/rooms/${roomId}`);
+    revalidatePath(`/rooms/${roomId}/setup`);
 
     track("room_created", { userId: identity.userId, teamId: identity.teamId, roomId });
     return NextResponse.json({ roomId, name }, { status: 201 });

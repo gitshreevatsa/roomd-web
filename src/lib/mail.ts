@@ -1,4 +1,5 @@
 import nodemailer, { type Transporter } from "nodemailer";
+import { createHash, randomBytes } from "crypto";
 import { buildInviteEmailHtml } from "@/lib/email/invite-template";
 
 /**
@@ -14,7 +15,11 @@ import { buildInviteEmailHtml } from "@/lib/email/invite-template";
  *   SMTP_USER      apikey / username
  *   SMTP_PASS      secret
  *   SMTP_FROM      "roomd <invites@roomd.sh>"
+ *   SMTP_REPLY_TO  optional; defaults to SMTP_FROM
  *   SMTP_SECURE    "true" to use TLS on connect (port 465); default false (STARTTLS)
+ *
+ * Deliverability: SMTP_FROM must use a domain with SPF/DKIM/DMARC aligned to
+ * the sending provider (e.g. Resend). Do not send as @roomd.sh through Gmail.
  */
 
 let cached: Transporter | null | undefined;
@@ -59,16 +64,44 @@ interface SendArgs {
   subject: string;
   text: string;
   html?: string;
+  /** Used for List-Unsubscribe / Message-ID domain. */
+  loginUrl?: string;
+}
+
+function fromDomain(from: string): string {
+  const match = from.match(/@([^>\s]+)/);
+  return match?.[1] ?? "roomd.sh";
 }
 
 /** Send one email. Never throws for a missing config; returns { sent: false }. */
-export async function sendMail({ to, subject, text, html }: SendArgs): Promise<MailResult> {
+export async function sendMail({ to, subject, text, html, loginUrl }: SendArgs): Promise<MailResult> {
   const tx = transporter();
   if (!tx) return { sent: false, reason: "SMTP not configured" };
 
   const from = process.env.SMTP_FROM ?? process.env.SMTP_USER!;
+  const replyTo = process.env.SMTP_REPLY_TO ?? from;
+  const site = process.env.NEXTAUTH_URL ?? "https://app.roomd.sh";
+  const unsub = loginUrl ?? `${site}/login`;
+  const domain = fromDomain(from);
+  const messageId = `<${randomBytes(12).toString("hex")}.${Date.now()}@${domain}>`;
+
   try {
-    await tx.sendMail({ from, to, subject, text, html: html ?? textToHtml(text) });
+    await tx.sendMail({
+      from,
+      to,
+      replyTo,
+      subject,
+      text,
+      html: html ?? textToHtml(text),
+      messageId,
+      headers: {
+        "Auto-Submitted": "auto-generated",
+        "X-Auto-Response-Suppress": "OOF, AutoReply",
+        "X-Entity-Ref-ID": createHash("sha256").update(`${to}:${subject}:${Date.now()}`).digest("hex").slice(0, 32),
+        "List-Unsubscribe": `<${unsub}>`,
+        Precedence: "bulk",
+      },
+    });
     return { sent: true };
   } catch (err) {
     console.error("[mail]", err instanceof Error ? err.message : err);
@@ -97,11 +130,19 @@ export async function sendInviteEmail(args: {
   const text =
     `${who} to roomd.\n\n` +
     `Sign in at ${loginUrl} with this key:\n\n${key}\n\n` +
-    `${scope} Keep the key somewhere safe.`;
+    `${scope} Keep the key somewhere safe.\n\n` +
+    `— roomd (https://roomd.sh)`;
 
   const html = buildInviteEmailHtml({ key, loginUrl, who, scope });
 
-  return sendMail({ to, subject: "Your roomd invite", text, html });
+  // Transactional wording — marketing-style subjects land in spam more often.
+  return sendMail({
+    to,
+    subject: "roomd access key",
+    text,
+    html,
+    loginUrl,
+  });
 }
 
 function textToHtml(text: string): string {

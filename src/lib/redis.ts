@@ -241,7 +241,7 @@ const accessDraftKey = (email: string) => `app:access-draft:${email}`;
 
 export type AccessSource = "direct" | "waitlist";
 
-/** In-flight invite: key minted, not yet delivered (Send/Copy). */
+/** In-flight invite: key minted, not yet fully finished (Send and/or Copy). */
 export interface AccessDraft {
   email: string;
   source: AccessSource;
@@ -251,6 +251,10 @@ export interface AccessDraft {
   /** sha256 of the minted secret — confirm must present the matching secret. */
   secretHash?: string;
   createdAt: string;
+  /** Set after Copy or Send so abandon does not revoke a delivered key. */
+  confirmedAt?: string;
+  /** Last delivery method used while the draft was still open. */
+  delivery?: "email" | "copy";
 }
 
 /**

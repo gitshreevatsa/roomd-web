@@ -66,9 +66,15 @@ export default function NewRoomPage() {
         const data = await res.json();
         throw new Error(data.error ?? "Failed to create room");
       }
-      const { roomId: created } = await res.json();
-      // Keep the button busy until setup mounts.
-      router.push(`/rooms/${created}/setup`);
+      const { roomId: created, name: createdName } = (await res.json()) as {
+        roomId: string;
+        name: string;
+      };
+      // Keep the button busy until setup mounts. Pass name so setup paints
+      // immediately even if the client router cache is briefly stale.
+      const q = createdName ? `?name=${encodeURIComponent(createdName)}` : "";
+      router.push(`/rooms/${created}/setup${q}`);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create room");
       setLoading(false);

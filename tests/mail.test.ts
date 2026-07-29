@@ -75,6 +75,11 @@ describe("sendInviteEmail", () => {
     const arg = sendMail.mock.calls[0][0];
     expect(arg.to).toBe("a@example.com");
     expect(arg.from).toBe("roomd <invites@roomd.sh>");
+    expect(arg.subject).toBe("roomd access key");
+    expect(arg.replyTo).toBe("roomd <invites@roomd.sh>");
+    expect(arg.messageId).toMatch(/@roomd\.sh>$/);
+    expect(arg.headers["List-Unsubscribe"]).toContain("https://app.roomd.sh/login");
+    expect(arg.headers["Auto-Submitted"]).toBe("auto-generated");
     expect(arg.text).toContain("sk-secret-123");
     expect(arg.text).toContain("https://app.roomd.sh/login");
     expect(arg.html).toContain("Your roomd access");
