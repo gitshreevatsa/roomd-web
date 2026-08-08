@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         ? "free"
         : planFromStripePriceId(priceId);
 
-    let user = teamId ? await getUserByTeamId(teamId) : null;
+    const user = teamId ? await getUserByTeamId(teamId) : null;
     // Fallback: find by stripeCustomerId would need an index; teamId metadata is required.
     if (user) {
       await updateUser(user.id, {
