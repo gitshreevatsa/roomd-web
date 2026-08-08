@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildAgentsMd,
   buildClientSnippet,
+  buildCodexCliAdd,
   buildCodexExportLine,
   buildSessionPrompt,
   type McpSnippetClient,
@@ -50,13 +51,11 @@ const CLIENTS: ClientGuide[] = [
   {
     id: "codex",
     label: "Codex",
-    configPath: "~/.codex/config.toml (or .codex/config.toml in a trusted project)",
-    restartHint:
-      "Restart Codex (CLI / IDE / ChatGPT desktop). Or run: codex mcp add roomd --url <url> --bearer-token-env-var ROOMD_API_KEY",
+    configPath: "~/.codex/config.toml",
+    restartHint: "Restart Codex CLI, the IDE extension, or ChatGPT desktop.",
     ruleHint: "Paste into AGENTS.md (Codex reads it at session start).",
     keyInEnv: true,
-    note:
-      "Codex uses TOML, not JSON. Put your team key (or room invite token) in the ROOMD_API_KEY env var — do not hard-code it in config.toml. Roomd is Bearer-only (no OAuth).",
+    note: "Codex uses TOML, not JSON. Keep the key in ROOMD_API_KEY — never in config.toml.",
   },
   {
     id: "other",
@@ -105,11 +104,24 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
             return (
               <TabsContent key={c.id} value={c.id} className="mt-0 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Add this to{" "}
-                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                    {c.configPath}
-                  </code>
-                  . {c.restartHint}
+                  {c.keyInEnv ? (
+                    <>
+                      Codex needs two pieces: an env var for the key, then a short
+                      TOML block in{" "}
+                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                        {c.configPath}
+                      </code>
+                      . {c.restartHint}
+                    </>
+                  ) : (
+                    <>
+                      Add this to{" "}
+                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                        {c.configPath}
+                      </code>
+                      . {c.restartHint}
+                    </>
+                  )}
                 </p>
 
                 {c.note && <p className="text-sm text-muted-foreground">{c.note}</p>}
@@ -126,62 +138,94 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
                 )}
 
                 {c.keyInEnv && (
-                  <div className="relative overflow-hidden rounded-xl border bg-muted/40">
-                    <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">
-                      {buildCodexExportLine(displayKey)}
-                    </pre>
-                    <div className="flex items-center gap-2 border-t bg-background/50 p-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setRevealed((r) => !r)}
-                        className="gap-1.5 text-muted-foreground"
-                      >
-                        {revealed ? (
-                          <>
-                            <EyeOff className="h-3.5 w-3.5" /> Hide key
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-3.5 w-3.5" /> Reveal key
-                          </>
-                        )}
-                      </Button>
-                      <CopyButton
-                        text={buildCodexExportLine(apiKey)}
-                        label="Copy export"
-                        className="ml-auto"
-                      />
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      1. Export the key
+                    </p>
+                    <div className="relative overflow-hidden rounded-xl border bg-muted/40">
+                      <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">
+                        {buildCodexExportLine(displayKey)}
+                      </pre>
+                      <div className="flex items-center gap-2 border-t bg-background/50 p-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setRevealed((r) => !r)}
+                          className="gap-1.5 text-muted-foreground"
+                        >
+                          {revealed ? (
+                            <>
+                              <EyeOff className="h-3.5 w-3.5" /> Hide key
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-3.5 w-3.5" /> Reveal key
+                            </>
+                          )}
+                        </Button>
+                        <CopyButton
+                          text={buildCodexExportLine(apiKey)}
+                          label="Copy export"
+                          className="ml-auto"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
-                <div className="relative overflow-hidden rounded-xl border bg-muted/40">
-                  <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">
-                    {snippetDisplay}
-                  </pre>
-                  <div className="flex items-center gap-2 border-t bg-background/50 p-2">
-                    {!c.keyInEnv && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setRevealed((r) => !r)}
-                        className="gap-1.5 text-muted-foreground"
-                      >
-                        {revealed ? (
-                          <>
-                            <EyeOff className="h-3.5 w-3.5" /> Hide key
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="h-3.5 w-3.5" /> Reveal key
-                          </>
-                        )}
-                      </Button>
-                    )}
-                    <CopyButton text={snippetCopy} label="Copy snippet" className="ml-auto" />
+                <div className="space-y-2">
+                  {c.keyInEnv && (
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      2. Add to config.toml
+                    </p>
+                  )}
+                  <div className="relative overflow-hidden rounded-xl border bg-muted/40">
+                    <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">
+                      {snippetDisplay}
+                    </pre>
+                    <div className="flex items-center gap-2 border-t bg-background/50 p-2">
+                      {!c.keyInEnv && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setRevealed((r) => !r)}
+                          className="gap-1.5 text-muted-foreground"
+                        >
+                          {revealed ? (
+                            <>
+                              <EyeOff className="h-3.5 w-3.5" /> Hide key
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-3.5 w-3.5" /> Reveal key
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      <CopyButton text={snippetCopy} label="Copy snippet" className="ml-auto" />
+                    </div>
                   </div>
                 </div>
+
+                {c.keyInEnv && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Or use the CLI
+                    </p>
+                    <div className="relative overflow-hidden rounded-xl border bg-muted/40">
+                      <pre className="overflow-x-auto whitespace-pre-wrap break-all p-4 font-mono text-xs sm:break-normal sm:whitespace-pre">
+                        {buildCodexCliAdd(mcpBase)}
+                      </pre>
+                      <div className="flex justify-end border-t bg-background/50 p-2">
+                        <CopyButton text={buildCodexCliAdd(mcpBase)} label="Copy CLI" />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Still set <code className="font-mono">ROOMD_API_KEY</code> in the
+                      environment that launches Codex.
+                    </p>
+                  </div>
+                )}
               </TabsContent>
             );
           })}

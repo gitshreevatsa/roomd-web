@@ -58,6 +58,12 @@ export function buildCodexExportLine(apiKey: string): string {
   return `export ROOMD_API_KEY="${apiKey}"`;
 }
 
+/** Optional one-liner instead of editing config.toml by hand. */
+export function buildCodexCliAdd(mcpBaseUrl: string): string {
+  const url = mcpEndpoint(mcpBaseUrl);
+  return `codex mcp add roomd --url ${url} --bearer-token-env-var ROOMD_API_KEY`;
+}
+
 export function buildOtherSnippet(mcpBaseUrl: string, apiKey: string): string {
   return buildCursorSnippet(mcpBaseUrl, apiKey);
 }

@@ -4,35 +4,68 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   buildClaudeSnippet,
+  buildCodexCliAdd,
+  buildCodexExportLine,
   buildCodexSnippet,
   buildCursorSnippet,
 } from "@/lib/mcp-snippets";
 
 const PLACEHOLDER_KEY = "<key>";
+const MCP_BASE = "https://api.roomd.sh";
 
-const SNIPPETS = {
+type SnippetBlock = {
+  label: string;
+  text: string;
+};
+
+type ClientSnippet = {
+  path: string;
+  hint?: string;
+  blocks: SnippetBlock[];
+};
+
+const SNIPPETS: Record<string, ClientSnippet> = {
   claude: {
     path: ".claude/settings.json",
-    text: buildClaudeSnippet("https://api.roomd.sh", PLACEHOLDER_KEY),
+    blocks: [{ label: "Paste into settings", text: buildClaudeSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
   },
   cursor: {
     path: ".cursor/mcp.json",
-    text: buildCursorSnippet("https://api.roomd.sh", PLACEHOLDER_KEY),
+    blocks: [{ label: "Paste into mcp.json", text: buildCursorSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
   },
   codex: {
     path: "~/.codex/config.toml",
-    text: `${buildCodexSnippet("https://api.roomd.sh")}\n\n# export ROOMD_API_KEY="<key>"`,
+    hint: "Codex is TOML + an env var — not the Claude/Cursor JSON block.",
+    blocks: [
+      {
+        label: "1. Export the key",
+        text: buildCodexExportLine(PLACEHOLDER_KEY),
+      },
+      {
+        label: "2. Add to config.toml",
+        text: buildCodexSnippet(MCP_BASE),
+      },
+      {
+        label: "Or one CLI command",
+        text: buildCodexCliAdd(MCP_BASE),
+      },
+    ],
   },
   other: {
     path: "any MCP client",
-    text: `{
+    blocks: [
+      {
+        label: "URL + Bearer header",
+        text: `{
   "url": "https://api.roomd.sh/mcp",
   "headers": {
     "Authorization": "Bearer <key>"
   }
 }`,
+      },
+    ],
   },
-} as const;
+};
 
 type Client = keyof typeof SNIPPETS;
 
@@ -41,6 +74,7 @@ type Client = keyof typeof SNIPPETS;
  */
 export function LandingConnect() {
   const [client, setClient] = useState<Client>("cursor");
+  const active = SNIPPETS[client];
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-lg shadow-black/[0.04] ring-1 ring-black/[0.03] dark:shadow-none dark:ring-white/[0.04]">
@@ -60,18 +94,31 @@ export function LandingConnect() {
               Other MCP
             </TabsTrigger>
           </TabsList>
-          <span className="font-mono text-xs text-muted-foreground">
-            {SNIPPETS[client].path}
-          </span>
+          <span className="font-mono text-xs text-muted-foreground">{active.path}</span>
         </div>
 
-        {(Object.keys(SNIPPETS) as Client[]).map((id) => (
-          <TabsContent key={id} value={id} className="mt-0">
-            <pre className="overflow-x-auto px-5 py-5 font-mono text-xs leading-relaxed text-foreground/90 md:text-sm">
-              {SNIPPETS[id].text}
-            </pre>
-          </TabsContent>
-        ))}
+        {(Object.keys(SNIPPETS) as Client[]).map((id) => {
+          const snip = SNIPPETS[id];
+          return (
+            <TabsContent key={id} value={id} className="mt-0">
+              <div className="space-y-0 divide-y divide-border/70">
+                {snip.hint && (
+                  <p className="px-5 py-3 text-xs text-muted-foreground md:text-sm">{snip.hint}</p>
+                )}
+                {snip.blocks.map((block) => (
+                  <div key={block.label} className="px-5 py-4">
+                    <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      {block.label}
+                    </p>
+                    <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs leading-relaxed text-foreground/90 md:text-sm md:break-normal md:whitespace-pre">
+                      {block.text}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+          );
+        })}
       </Tabs>
     </div>
   );

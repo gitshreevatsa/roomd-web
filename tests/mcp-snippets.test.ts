@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   buildClaudeSnippet,
+  buildCodexCliAdd,
   buildCodexExportLine,
   buildCodexSnippet,
   buildCursorSnippet,
@@ -54,6 +55,14 @@ describe("mcp-snippets", () => {
 
   it("builds Codex export line with the real key", () => {
     expect(buildCodexExportLine(key)).toBe(`export ROOMD_API_KEY="${key}"`);
+  });
+
+  it("builds Codex CLI add without embedding the secret", () => {
+    const cli = buildCodexCliAdd(base);
+    expect(cli).toContain("codex mcp add roomd");
+    expect(cli).toContain("--url https://api.roomd.sh/mcp");
+    expect(cli).toContain("--bearer-token-env-var ROOMD_API_KEY");
+    expect(cli).not.toContain(key);
   });
 
   it("routes buildClientSnippet for codex without requiring a key in TOML", () => {
