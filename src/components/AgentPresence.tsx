@@ -19,7 +19,7 @@ export function AgentPresence({ agents, tasks, roomId, onRefresh, refreshing }: 
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground space-y-3">
         <p className="font-medium">No agents have connected yet.</p>
-        <p className="text-sm">Follow the setup guide to connect your first agent (Claude Code, Cursor, or any MCP client).</p>
+        <p className="text-sm">Follow the setup guide to connect your first agent (Claude Code, Cursor, Codex, or any MCP client).</p>
         <PendingLink href={`/rooms/${roomId}/setup`}>
           <Button variant="outline" size="sm">Open setup guide</Button>
         </PendingLink>

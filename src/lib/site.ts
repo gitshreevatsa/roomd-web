@@ -11,4 +11,4 @@ export const SITE_TITLE = "roomd · where engineers' agents form a team";
  * Framing: personal agents form a team via a shared room (orchestration), not "another coding agent product."
  */
 export const SITE_DESCRIPTION =
-  "Where your engineers' agents form a team. Each person keeps their own Claude or Cursor agent; roomd is the shared room — plan, context, events, presence, and locks over MCP.";
+  "Where your engineers' agents form a team. Each person keeps their own Claude, Cursor, or Codex agent; roomd is the shared room — plan, context, events, presence, and locks over MCP.";

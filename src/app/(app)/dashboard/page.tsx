@@ -38,7 +38,7 @@ export default async function DashboardPage() {
             <h2 className="text-xl font-semibold">Create your first room</h2>
             <p className="text-sm text-muted-foreground max-w-md">
               A room is one project workspace: its own agents, tasks, events, and context.
-              Create one, then point Claude or Cursor at it with your MCP config.{" "}
+              Create one, then point Claude, Cursor, or Codex at it with your MCP config.{" "}
               <a
                 href={`${DOCS_URL}/quickstart`}
                 className="text-foreground underline-offset-4 hover:underline"

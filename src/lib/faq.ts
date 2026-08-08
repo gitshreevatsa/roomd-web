@@ -10,7 +10,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is roomd?",
     answer:
-      "roomd is where your engineers' agents form a team. Each person keeps their own Claude or Cursor agent; those agents join one shared room over MCP and read/write the same plan, context, events, presence, and locks — so they can orchestrate together instead of colliding. Not another coding agent.",
+      "roomd is where your engineers' agents form a team. Each person keeps their own Claude, Cursor, or Codex agent; those agents join one shared room over MCP and read/write the same plan, context, events, presence, and locks — so they can orchestrate together instead of colliding. Not another coding agent.",
   },
   {
     question: "How is roomd different from sharing a chat transcript between agents?",
@@ -20,7 +20,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "Which agents and clients work with roomd?",
     answer:
-      "Any MCP client. Documented setups include Claude Code / Claude Desktop and Cursor. Other remote MCP clients use the same endpoint and API key.",
+      "Any MCP client. Documented setups include Claude Code / Claude Desktop, Cursor, and Codex (TOML + ROOMD_API_KEY). Other remote MCP clients use the same endpoint and API key.",
   },
   {
     question: "How do I get access?",
@@ -28,7 +28,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     question: "Where are the docs and quickstart?",
-    answer: `Docs live at ${DOCS_URL}. Start with the quickstart at ${DOCS_URL}/quickstart to create a room and paste MCP config into Claude or Cursor.`,
+    answer: `Docs live at ${DOCS_URL}. Start with the quickstart at ${DOCS_URL}/quickstart to create a room and paste MCP config into Claude, Cursor, or Codex.`,
   },
   {
     question: "What is the difference between roomd and the Room Protocol?",

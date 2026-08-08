@@ -5,6 +5,13 @@ import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/CopyButton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  buildAgentsMd,
+  buildClientSnippet,
+  buildCodexExportLine,
+  buildSessionPrompt,
+  type McpSnippetClient,
+} from "@/lib/mcp-snippets";
 
 interface SetupSnippetProps {
   collabMcpUrl: string;
@@ -12,7 +19,7 @@ interface SetupSnippetProps {
   roomId: string;
 }
 
-type ClientId = "claude" | "cursor" | "other";
+type ClientId = McpSnippetClient;
 
 interface ClientGuide {
   id: ClientId;
@@ -20,8 +27,9 @@ interface ClientGuide {
   configPath: string;
   restartHint: string;
   ruleHint: string;
-  /** JSON config object for this client (key still raw for copy). */
-  buildConfig: (mcpUrl: string, apiKey: string) => object;
+  /** Codex: key lives in env, not in the TOML snippet. */
+  keyInEnv?: boolean;
+  note?: string;
 }
 
 const CLIENTS: ClientGuide[] = [
@@ -30,52 +38,32 @@ const CLIENTS: ClientGuide[] = [
     label: "Claude Code",
     configPath: ".claude/settings.json",
     restartHint: "Restart Claude Code after saving.",
-    ruleHint: "Add the room details to CLAUDE.md in the project root.",
-    buildConfig: (mcpUrl, apiKey) => ({
-      mcpServers: {
-        roomd: {
-          type: "http",
-          url: `${mcpUrl}/mcp`,
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        },
-      },
-    }),
+    ruleHint: "Paste into CLAUDE.md in the project root (or merge with an existing roomd section).",
   },
   {
     id: "cursor",
     label: "Cursor",
     configPath: ".cursor/mcp.json",
     restartHint: "Reload MCP in Cursor Settings → Tools & MCP, or restart Cursor.",
-    ruleHint: "Add the room details to a Cursor rule or AGENTS.md in the project.",
-    buildConfig: (mcpUrl, apiKey) => ({
-      mcpServers: {
-        roomd: {
-          url: `${mcpUrl}/mcp`,
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        },
-      },
-    }),
+    ruleHint: "Paste into AGENTS.md in the project root (or a Cursor project rule).",
+  },
+  {
+    id: "codex",
+    label: "Codex",
+    configPath: "~/.codex/config.toml (or .codex/config.toml in a trusted project)",
+    restartHint:
+      "Restart Codex (CLI / IDE / ChatGPT desktop). Or run: codex mcp add roomd --url <url> --bearer-token-env-var ROOMD_API_KEY",
+    ruleHint: "Paste into AGENTS.md (Codex reads it at session start).",
+    keyInEnv: true,
+    note:
+      "Codex uses TOML, not JSON. Put your team key (or room invite token) in the ROOMD_API_KEY env var — do not hard-code it in config.toml. Roomd is Bearer-only (no OAuth).",
   },
   {
     id: "other",
     label: "Other MCP",
     configPath: "your MCP client config",
     restartHint: "Reload or restart the client after adding the server.",
-    ruleHint: "Put the room details somewhere your agent reads on every session.",
-    buildConfig: (mcpUrl, apiKey) => ({
-      mcpServers: {
-        roomd: {
-          url: `${mcpUrl}/mcp`,
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        },
-      },
-    }),
+    ruleHint: "Put this AGENTS.md block somewhere your agent reads on every session.",
   },
 ];
 
@@ -85,21 +73,11 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
 
   const guide = CLIENTS.find((c) => c.id === client) ?? CLIENTS[0];
   const mcpBase = collabMcpUrl.replace(/\/$/, "");
-
   const maskedKey = `${"•".repeat(Math.max(apiKey.length - 4, 8))}${apiKey.slice(-4)}`;
   const displayKey = revealed ? apiKey : maskedKey;
 
-  const promptText =
-    `We coordinate through a roomd room. Room ID: ${roomId}\n\n` +
-    `At the start of the session, call:\n` +
-    `get_my_summary({\n  roomId: "${roomId}",\n  agentId: "your-name"\n})\n\n` +
-    `Use a different agentId per engineer / client.`;
-
-  const ruleBlock =
-    `## roomd\n` +
-    `- roomId: \`${roomId}\`\n` +
-    `- your agent id: \`agent-yourname\`\n` +
-    `- call get_my_summary at the start of every session\n`;
+  const agentsMd = buildAgentsMd(roomId);
+  const promptText = buildSessionPrompt(roomId);
 
   return (
     <div className="space-y-8">
@@ -107,7 +85,7 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
         <div className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h3 className="text-sm font-semibold">Step 1: connect your agent</h3>
-            <TabsList className="h-9 w-full sm:w-auto">
+            <TabsList className="h-auto w-full flex-wrap sm:w-auto">
               {CLIENTS.map((c) => (
                 <TabsTrigger key={c.id} value={c.id} className="flex-1 text-xs sm:flex-none sm:text-sm">
                   {c.label}
@@ -116,81 +94,127 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
             </TabsList>
           </div>
 
-          {CLIENTS.map((c) => (
-            <TabsContent key={c.id} value={c.id} className="mt-0 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Add this to{" "}
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                  {c.configPath}
-                </code>{" "}
-                in the project the agent works in. {c.restartHint}
-              </p>
+          {CLIENTS.map((c) => {
+            const snippetDisplay = c.keyInEnv
+              ? buildClientSnippet(c.id, mcpBase, "")
+              : buildClientSnippet(c.id, mcpBase, displayKey);
+            const snippetCopy = c.keyInEnv
+              ? buildClientSnippet(c.id, mcpBase, "")
+              : buildClientSnippet(c.id, mcpBase, apiKey);
 
-              {c.id === "other" && (
+            return (
+              <TabsContent key={c.id} value={c.id} className="mt-0 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  roomd speaks streamable HTTP at{" "}
+                  Add this to{" "}
                   <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                    {mcpBase}/mcp
+                    {c.configPath}
                   </code>
-                  . Any MCP client that can send a Bearer header to an HTTP
-                  server works (Windsurf, Continue, custom agents, etc.).
+                  . {c.restartHint}
                 </p>
-              )}
 
-              <div className="relative overflow-hidden rounded-xl border bg-muted/40">
-                <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">
-                  {JSON.stringify(c.buildConfig(mcpBase, displayKey), null, 2)}
-                </pre>
-                <div className="flex items-center gap-2 border-t bg-background/50 p-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRevealed((r) => !r)}
-                    className="gap-1.5 text-muted-foreground"
-                  >
-                    {revealed ? (
-                      <>
-                        <EyeOff className="h-3.5 w-3.5" /> Hide key
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="h-3.5 w-3.5" /> Reveal key
-                      </>
+                {c.note && <p className="text-sm text-muted-foreground">{c.note}</p>}
+
+                {c.id === "other" && (
+                  <p className="text-sm text-muted-foreground">
+                    roomd speaks streamable HTTP at{" "}
+                    <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      {mcpBase}/mcp
+                    </code>
+                    . Any MCP client that can send a Bearer header to an HTTP server
+                    works (Windsurf, Continue, custom agents, etc.).
+                  </p>
+                )}
+
+                {c.keyInEnv && (
+                  <div className="relative overflow-hidden rounded-xl border bg-muted/40">
+                    <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">
+                      {buildCodexExportLine(displayKey)}
+                    </pre>
+                    <div className="flex items-center gap-2 border-t bg-background/50 p-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRevealed((r) => !r)}
+                        className="gap-1.5 text-muted-foreground"
+                      >
+                        {revealed ? (
+                          <>
+                            <EyeOff className="h-3.5 w-3.5" /> Hide key
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3.5 w-3.5" /> Reveal key
+                          </>
+                        )}
+                      </Button>
+                      <CopyButton
+                        text={buildCodexExportLine(apiKey)}
+                        label="Copy export"
+                        className="ml-auto"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative overflow-hidden rounded-xl border bg-muted/40">
+                  <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">
+                    {snippetDisplay}
+                  </pre>
+                  <div className="flex items-center gap-2 border-t bg-background/50 p-2">
+                    {!c.keyInEnv && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setRevealed((r) => !r)}
+                        className="gap-1.5 text-muted-foreground"
+                      >
+                        {revealed ? (
+                          <>
+                            <EyeOff className="h-3.5 w-3.5" /> Hide key
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3.5 w-3.5" /> Reveal key
+                          </>
+                        )}
+                      </Button>
                     )}
-                  </Button>
-                  <CopyButton
-                    text={JSON.stringify(c.buildConfig(mcpBase, apiKey), null, 2)}
-                    label="Copy snippet"
-                    className="ml-auto"
-                  />
+                    <CopyButton text={snippetCopy} label="Copy snippet" className="ml-auto" />
+                  </div>
                 </div>
-              </div>
-            </TabsContent>
-          ))}
+              </TabsContent>
+            );
+          })}
         </div>
       </Tabs>
 
-      {/* Step 2: room identity (same for every client) */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold">Step 2: tell the agent which room to join</h3>
+        <h3 className="text-sm font-semibold">Step 2: add AGENTS.md (stay online + log chats)</h3>
         <p className="text-sm text-muted-foreground">{guide.ruleHint}</p>
+        <p className="text-sm text-muted-foreground">
+          This block makes the agent call <code className="font-mono text-xs">heartbeat</code>{" "}
+          so it stays green on the Agents tab, and{" "}
+          <code className="font-mono text-xs">write_context</code> so every chat turn lands in
+          room context.
+        </p>
         <div className="relative overflow-hidden rounded-xl border bg-muted/40">
-          <pre className="overflow-x-auto whitespace-pre p-4 font-mono text-xs">{ruleBlock}</pre>
+          <pre className="max-h-96 overflow-auto whitespace-pre p-4 font-mono text-xs">{agentsMd}</pre>
           <div className="flex justify-end border-t bg-background/50 p-2">
-            <CopyButton text={ruleBlock} label="Copy room block" />
+            <CopyButton text={agentsMd} label="Copy AGENTS.md" />
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Every agent uses the same <code className="font-mono">roomId</code> and a
-          different <code className="font-mono">agentId</code>.
+          Same <code className="font-mono">roomId</code> for every teammate; a different{" "}
+          <code className="font-mono">agentId</code> per chat or process. Replace{" "}
+          <code className="font-mono">agent-yourname</code> before saving.
         </p>
       </div>
 
-      {/* Step 3: kickoff prompt */}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold">Step 3: start the session</h3>
         <p className="text-sm text-muted-foreground">
-          Paste this (or say it in your own words) once the MCP server is connected.
+          Paste this (or say it in your own words) once the MCP server is connected. Confirm the
+          agent appears online on the room dashboard, then check Context for chat notes.
         </p>
         <div className="relative overflow-hidden rounded-xl border bg-muted/40">
           <pre className="whitespace-pre p-4 font-mono text-xs">{promptText}</pre>

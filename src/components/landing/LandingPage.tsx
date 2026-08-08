@@ -123,7 +123,7 @@ function Hero() {
           </h1>
 
           <p className="max-w-lg text-balance text-lg leading-relaxed text-muted-foreground">
-            Each engineer keeps their own Claude or Cursor agent. roomd is the
+            Each engineer keeps their own Claude, Cursor, or Codex agent. roomd is the
             shared room that lets those agents work together — plan, contracts,
             presence, and locks — without replacing them.
           </p>
@@ -143,7 +143,7 @@ function Hero() {
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Claude Code, Cursor, or any MCP client. Same room.{" "}
+            Claude Code, Cursor, Codex, or any MCP client. Same room.{" "}
             <Link href="/login" className="text-foreground underline-offset-4 hover:underline">
               I have a key
             </Link>
@@ -246,7 +246,7 @@ function HowItWorks() {
     {
       n: "02",
       title: "Point every agent at it",
-      body: "Each engineer pastes one MCP config block (Claude Code, Cursor, or another client) and uses the same roomId.",
+      body: "Each engineer pastes one MCP config block (Claude Code, Cursor, Codex, or another client) and uses the same roomId.",
     },
     {
       n: "03",
@@ -287,7 +287,7 @@ function Connect() {
             Point each agent at the same roomId
           </h2>
           <p className="max-w-md text-muted-foreground">
-            Paste the MCP snippet for your client. Claude Code, Cursor, and other
+            Paste the MCP snippet for your client. Claude Code, Cursor, Codex, and other
             MCP clients use the same{" "}
             <code className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground">
               roomId
@@ -345,7 +345,7 @@ function ClosingCta() {
           Where your engineers&apos; agents form a team
         </p>
         <p className="mx-auto mt-4 max-w-md text-balance text-[hsl(140_6%_58%)]">
-          Request access, create a room, and point Claude or Cursor at it.
+          Request access, create a room, and point Claude, Cursor, or Codex at it.
         </p>
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Button
