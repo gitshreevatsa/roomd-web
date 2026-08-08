@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Test
+        run: npm test
+        env:
+          NEXTAUTH_SECRET: test-secret-at-least-32-chars-long!!
+          UPSTASH_REDIS_REST_URL: http://localhost
+          UPSTASH_REDIS_REST_TOKEN: test
+          ROOMD_URL: http://localhost:3010
+          ROOMD_MASTER_KEY: test-master
+      - name: Lint
+        run: npm run lint
+        continue-on-error: true

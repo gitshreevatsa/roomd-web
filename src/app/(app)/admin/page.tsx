@@ -46,6 +46,7 @@ export default function AdminPage() {
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [teammateEmail, setTeammateEmail] = useState("");
   const [keyNote, setKeyNote] = useState("");
+  const [keyBoundAgentId, setKeyBoundAgentId] = useState("");
   const [createKeyOpen, setCreateKeyOpen] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
@@ -167,10 +168,14 @@ export default function AdminPage() {
     if (!note) return;
     setLoading(true);
     try {
+      const bound = keyBoundAgentId.trim();
       const res = await fetch("/api/admin/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note }),
+        body: JSON.stringify({
+          note,
+          ...(bound ? { boundAgentId: bound } : {}),
+        }),
       });
       if (res.ok) {
         const data = await res.json() as { secret: string };
@@ -188,6 +193,7 @@ export default function AdminPage() {
     setCreateKeyOpen(false);
     setNewKey(null);
     setKeyNote("");
+    setKeyBoundAgentId("");
   }
 
   async function revokeKey(keyId: string) {
@@ -290,6 +296,7 @@ export default function AdminPage() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Note</th>
+                    <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Agent</th>
                     <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Key ID</th>
                     <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Secret hint</th>
                     <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">Created</th>
@@ -301,6 +308,9 @@ export default function AdminPage() {
                     <tr key={key.keyId}>
                       <td className="px-4 py-2">
                         {key.note || <span className="text-muted-foreground">-</span>}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {key.boundAgentId || <span className="text-muted-foreground">-</span>}
                       </td>
                       <td className="px-4 py-2 font-mono text-xs">{key.keyId.slice(0, 10)}</td>
                       <td className="px-4 py-2 font-mono text-xs">{key.hint}</td>
@@ -338,8 +348,11 @@ export default function AdminPage() {
         <CardHeader>
           <CardTitle>Webhooks</CardTitle>
           <CardDescription className="mt-1">
-            HTTPS endpoints notified when room events are posted. Verify with the
-            X-Roomd-Signature HMAC header.
+            HTTPS endpoints notified when room events are posted. Verify with
+            HMAC-SHA256 over <code className="text-xs">timestamp.nonce.body</code>{" "}
+            using <code className="text-xs">X-Roomd-Signature</code>,{" "}
+            <code className="text-xs">X-Roomd-Timestamp</code>, and{" "}
+            <code className="text-xs">X-Roomd-Nonce</code> (reject skew &gt; ~5 min).
           </CardDescription>
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <Input
@@ -413,7 +426,9 @@ export default function AdminPage() {
           <DialogHeader>
             <DialogTitle>Webhook secret</DialogTitle>
             <DialogDescription>
-              Save this now. It won&apos;t be shown again. Use it to verify X-Roomd-Signature.
+              Save this now. It won&apos;t be shown again. Sign{" "}
+              <code className="text-xs">timestamp.nonce.body</code> with it
+              (headers: X-Roomd-Signature, X-Roomd-Timestamp, X-Roomd-Nonce).
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border bg-muted p-3 font-mono text-sm break-all">
@@ -555,6 +570,19 @@ export default function AdminPage() {
                     if (e.key === "Enter" && keyNote.trim() && !loading) createKey();
                   }}
                 />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="key-agent">Bound agent id (for approve/reject)</Label>
+                <Input
+                  id="key-agent"
+                  placeholder="e.g. maya-agent (optional but required for reviews)"
+                  value={keyBoundAgentId}
+                  onChange={(e) => setKeyBoundAgentId(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Static team keys cannot resolve reviews. Bind an agent id on dyn keys
+                  used by agents that call approve/reject.
+                </p>
               </div>
               <DialogFooter className="gap-2">
                 <Button variant="outline" onClick={closeCreateKey}>Cancel</Button>

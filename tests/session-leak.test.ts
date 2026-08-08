@@ -6,10 +6,11 @@ import { authConfig } from "@/auth.config";
  * logged-in browser. Anything the session() callback attaches is therefore
  * public to that user's client.
  *
- * The roomd apiKey is a bearer credential for the whole team. It must not
- * reach the JWT or the Session. This drives the real jwt/session callbacks,
- * which live in the edge-safe base config, to prove it. Those callbacks pull in
- * nothing external, so no mocks are needed.
+ * The roomd apiKey is a bearer credential. It must not reach the JWT or the
+ * Session. Identity v2 keeps this invariant: key stays in Redis (AES-GCM),
+ * loaded only via getServerIdentity on the server.
+ *
+ * This drives the real jwt/session callbacks in the edge-safe base config.
  */
 
 const SECRET = "sk-live-team-wide-bearer-token";

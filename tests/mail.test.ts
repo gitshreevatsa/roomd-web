@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
  * The mail module must never throw when SMTP is unconfigured (invites still
  * succeed and fall back to a copyable message), and must actually call the
  * transporter when it is configured. We mock nodemailer to assert both.
+ *
+ * Invite emails carry a redeem URL only — never the raw API key.
  */
 
 const sendMail = vi.fn().mockResolvedValue({ messageId: "x" });
@@ -50,23 +52,24 @@ describe("sendInviteEmail", () => {
     const mail = await fresh();
     const res = await mail.sendInviteEmail({
       to: "a@example.com",
-      key: "sk-123",
+      redeemUrl: "https://app.roomd.sh/redeem/abc",
       loginUrl: "https://app.roomd.sh/login",
     });
     expect(res.sent).toBe(false);
     expect(sendMail).not.toHaveBeenCalled();
   });
 
-  it("sends the key and login link when SMTP is configured", async () => {
+  it("sends the redeem link (not the raw key) when SMTP is configured", async () => {
     process.env.SMTP_HOST = "smtp.test";
     process.env.SMTP_USER = "u";
     process.env.SMTP_PASS = "p";
     process.env.SMTP_FROM = "roomd <invites@roomd.sh>";
     const mail = await fresh();
 
+    const redeemUrl = "https://app.roomd.sh/redeem/tok123";
     const res = await mail.sendInviteEmail({
       to: "a@example.com",
-      key: "sk-secret-123",
+      redeemUrl,
       loginUrl: "https://app.roomd.sh/login",
     });
 
@@ -75,15 +78,16 @@ describe("sendInviteEmail", () => {
     const arg = sendMail.mock.calls[0][0];
     expect(arg.to).toBe("a@example.com");
     expect(arg.from).toBe("roomd <invites@roomd.sh>");
-    expect(arg.subject).toBe("roomd access key");
+    expect(arg.subject).toBe("Your roomd access link");
     expect(arg.replyTo).toBe("roomd <invites@roomd.sh>");
     expect(arg.messageId).toMatch(/@roomd\.sh>$/);
     expect(arg.headers["List-Unsubscribe"]).toContain("https://app.roomd.sh/login");
     expect(arg.headers["Auto-Submitted"]).toBe("auto-generated");
-    expect(arg.text).toContain("sk-secret-123");
+    expect(arg.text).toContain(redeemUrl);
     expect(arg.text).toContain("https://app.roomd.sh/login");
+    expect(arg.text).not.toContain("sk-secret");
     expect(arg.html).toContain("Your roomd access");
-    expect(arg.html).toContain("sk-secret-123");
+    expect(arg.html).toContain(redeemUrl);
     expect(arg.html).toContain("https://app.roomd.sh/login");
     expect(arg.html).toContain("#1a9e48");
   });
@@ -96,7 +100,7 @@ describe("sendInviteEmail", () => {
     const mail = await fresh();
     const res = await mail.sendInviteEmail({
       to: "a@example.com",
-      key: "k",
+      redeemUrl: "https://x/redeem/t",
       loginUrl: "https://x/login",
     });
     expect(res.sent).toBe(false);

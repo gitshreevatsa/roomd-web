@@ -1,7 +1,8 @@
+import { createHash } from "crypto";
 import { Redis } from "@upstash/redis";
 import { generateId } from "@/lib/utils";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
-import type { UserRecord, RoomMeta } from "@/types";
+import type { UserRecord, MembershipRecord, RoomMeta } from "@/types";
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -9,7 +10,7 @@ const redis = new Redis({
 });
 
 // ---------------------------------------------------------------------------
-// Users
+// Users (Identity v2: User ↔ Membership ↔ Team)
 // ---------------------------------------------------------------------------
 
 /** Thrown when an email address is already attached to another account. */
@@ -21,9 +22,9 @@ export class EmailTakenError extends Error {
 }
 
 /**
- * The apiKey is a live, team-wide bearer token for roomd, and it shares a
- * Redis instance with roomd's own records. It is encrypted at rest so a
- * database dump alone does not yield working credentials.
+ * The apiKey is a live bearer token for roomd, and it shares a Redis instance
+ * with roomd's own records. It is encrypted at rest so a database dump alone
+ * does not yield working credentials.
  */
 function serialiseUser(user: UserRecord): string {
   return JSON.stringify({ ...user, apiKey: encryptSecret(user.apiKey) });
@@ -31,11 +32,8 @@ function serialiseUser(user: UserRecord): string {
 
 function deserialiseUser(raw: string | UserRecord): UserRecord {
   const parsed = (typeof raw === "string" ? JSON.parse(raw) : raw) as UserRecord;
-  // If the stored key cannot be decrypted (NEXTAUTH_SECRET was rotated, or the
-  // record predates encryption changes), degrade to an empty key instead of
-  // throwing. An API-key login re-stores the real key from what the user typed;
-  // an email/OAuth user is prompted to sign in with their key again. Either way
-  // login is not bricked.
+  // Decrypt failure → empty apiKey. Callers must treat empty as unauthenticated
+  // (see getServerIdentity); do not serve an authenticated empty-key session.
   let apiKey = "";
   try {
     apiKey = decryptSecret(parsed.apiKey);
@@ -45,8 +43,31 @@ function deserialiseUser(raw: string | UserRecord): UserRecord {
   return { ...parsed, apiKey };
 }
 
+/** SHA-256 hex prefix used as the apiKey login lookup index. */
+export function apiKeyDigestHint(apiKey: string): string {
+  return createHash("sha256").update(apiKey).digest("hex").slice(0, 32);
+}
+
+function keyHintKey(apiKey: string): string {
+  return `app:user:keyhint:${apiKeyDigestHint(apiKey)}`;
+}
+
+function membershipKey(userId: string, teamId: string): string {
+  return `app:membership:${userId}:${teamId}`;
+}
+
+async function setKeyHintIndex(userId: string, apiKey: string): Promise<void> {
+  if (!apiKey) return;
+  await redis.set(keyHintKey(apiKey), userId);
+}
+
+async function clearKeyHintIndex(apiKey: string): Promise<void> {
+  if (!apiKey) return;
+  await redis.del(keyHintKey(apiKey));
+}
+
 /**
- * Create a user record.
+ * Create a user record and (by default) an owner membership on `teamId`.
  *
  * The email index is claimed with SET NX before the record is written, so two
  * concurrent signups for the same address cannot both succeed. To attach a new
@@ -54,10 +75,12 @@ function deserialiseUser(raw: string | UserRecord): UserRecord {
  * linkAuthMethod instead.
  */
 export async function createUser(
-  data: Omit<UserRecord, "id">
+  data: Omit<UserRecord, "id">,
+  opts?: { role?: "owner" | "member"; skipMembership?: boolean },
 ): Promise<UserRecord> {
   const id = generateId("user");
   const user: UserRecord = { ...data, id };
+  const role = opts?.role ?? "owner";
 
   if (user.email) {
     const claimed = await redis.set(`app:user:email:${user.email}`, id, { nx: true });
@@ -65,46 +88,44 @@ export async function createUser(
   }
 
   await redis.set(`app:user:${id}`, serialiseUser(user));
-  await redis.set(`app:user:apikey:${user.teamId}`, id);
+  await setKeyHintIndex(id, user.apiKey);
   await redis.sadd("app:users", id);
+
+  // Owner index (legacy `app:user:apikey:{teamId}` kept as owner pointer, NX only).
+  if (role === "owner") {
+    await redis.set(`app:team:${user.teamId}:owner`, id, { nx: true });
+    await redis.set(`app:user:apikey:${user.teamId}`, id, { nx: true });
+  }
+
+  if (!opts?.skipMembership) {
+    await upsertMembership({
+      userId: id,
+      teamId: user.teamId,
+      role,
+      createdAt: user.createdAt,
+    });
+  }
 
   return user;
 }
 
 /**
- * Idempotent create-or-fetch for API key logins.
- *
- * Uses SET NX on the teamId index so concurrent first-logins for the same
- * teamId converge to one user record rather than creating duplicates.
- * The winner of the SET NX race creates the record; the loser reads it.
+ * @deprecated Identity v2: do not upsert users by teamId — teammates would
+ * collapse onto one record. Prefer findOrCreateUserForApiKey / getUserByApiKey.
+ * Kept for migration callers; NX-claims the owner index only.
  */
 export async function upsertUserByTeamId(
   data: Omit<UserRecord, "id">
 ): Promise<UserRecord> {
-  const newId = generateId("user");
-  const indexKey = `app:user:apikey:${data.teamId}`;
-
-  // Atomically claim the index slot. Returns "OK" if we won, null if already set.
-  const claimed = await redis.set(indexKey, newId, { nx: true });
-
-  if (claimed === "OK") {
-    // We won the race, so write the full user record.
-    const user: UserRecord = { ...data, id: newId };
-    await redis.set(`app:user:${newId}`, serialiseUser(user));
-    if (user.email) await redis.set(`app:user:email:${user.email}`, newId);
-    await redis.sadd("app:users", newId);
-    return user;
+  const existingOwner = await getTeamOwnerId(data.teamId);
+  if (existingOwner) {
+    const existing = await getUserById(existingOwner);
+    if (existing) {
+      await redis.sadd("app:users", existing.id);
+      return existing;
+    }
   }
-
-  // Another request already created this user, so read and return it.
-  const existingId = await redis.get<string>(indexKey);
-  if (!existingId) throw new Error("upsertUserByTeamId: index race, slot missing");
-  const existing = await getUserById(existingId);
-  if (!existing) throw new Error("upsertUserByTeamId: index points to missing user");
-  // Backfill the global index on every login, so accounts created before the
-  // index existed still show up in operator analytics.
-  await redis.sadd("app:users", existing.id);
-  return existing;
+  return createUser(data, { role: "owner" });
 }
 
 export async function getUserById(id: string): Promise<UserRecord | null> {
@@ -119,8 +140,27 @@ export async function getUserByEmail(email: string): Promise<UserRecord | null> 
   return getUserById(id);
 }
 
+/** Look up the user who owns this exact apiKey (digest index). */
+export async function getUserByApiKey(apiKey: string): Promise<UserRecord | null> {
+  if (!apiKey) return null;
+  const id = await redis.get<string>(keyHintKey(apiKey));
+  if (!id) return null;
+  return getUserById(id);
+}
+
+/**
+ * Team owner lookup. Prefers `app:team:{teamId}:owner`; falls back to legacy
+ * `app:user:apikey:{teamId}` (deprecated exclusive-identity index).
+ */
+export async function getTeamOwnerId(teamId: string): Promise<string | null> {
+  const owner = await redis.get<string>(`app:team:${teamId}:owner`);
+  if (owner) return owner;
+  return redis.get<string>(`app:user:apikey:${teamId}`);
+}
+
+/** @deprecated Use getTeamOwnerId + memberships. Returns the team owner user only. */
 export async function getUserByTeamId(teamId: string): Promise<UserRecord | null> {
-  const id = await redis.get<string>(`app:user:apikey:${teamId}`);
+  const id = await getTeamOwnerId(teamId);
   if (!id) return null;
   return getUserById(id);
 }
@@ -146,6 +186,11 @@ export async function updateUser(
     await redis.set(`app:user:email:${patch.email}`, id);
   }
 
+  if (patch.apiKey !== undefined && patch.apiKey !== existing.apiKey) {
+    await clearKeyHintIndex(existing.apiKey);
+    await setKeyHintIndex(id, patch.apiKey);
+  }
+
   const updated = { ...existing, ...patch };
   await redis.set(`app:user:${id}`, serialiseUser(updated));
 }
@@ -164,12 +209,26 @@ export async function enableUser(id: string): Promise<void> {
   await redis.set(`app:user:${id}`, serialiseUser(rest));
 }
 
-/** Hard-delete the dashboard user record and its indexes. */
+/** Hard-delete the dashboard user record, memberships, and indexes. */
 export async function deleteUser(id: string): Promise<void> {
   const existing = await getUserById(id);
   if (!existing) return;
+
+  const teamIds = await listUserTeamIds(id);
+  for (const teamId of teamIds) {
+    await removeMembership(id, teamId);
+  }
+
   if (existing.email) await redis.del(`app:user:email:${existing.email}`);
-  await redis.del(`app:user:apikey:${existing.teamId}`);
+  await clearKeyHintIndex(existing.apiKey);
+
+  const ownerId = await getTeamOwnerId(existing.teamId);
+  if (ownerId === id) {
+    await redis.del(`app:team:${existing.teamId}:owner`);
+    const legacy = await redis.get<string>(`app:user:apikey:${existing.teamId}`);
+    if (legacy === id) await redis.del(`app:user:apikey:${existing.teamId}`);
+  }
+
   await redis.del(`app:user:${id}`);
   await redis.srem("app:users", id);
 }
@@ -180,6 +239,157 @@ export async function linkAuthMethod(
   externalId: string
 ): Promise<void> {
   await redis.set(`app:user:${provider}:${externalId}`, userId);
+}
+
+// ---------------------------------------------------------------------------
+// Memberships (Identity v2)
+// ---------------------------------------------------------------------------
+
+export async function upsertMembership(m: MembershipRecord): Promise<void> {
+  await redis.set(membershipKey(m.userId, m.teamId), JSON.stringify(m));
+  await redis.sadd(`app:team:${m.teamId}:members`, m.userId);
+  await redis.sadd(`app:user:${m.userId}:teams`, m.teamId);
+
+  if (m.role === "owner") {
+    await redis.set(`app:team:${m.teamId}:owner`, m.userId, { nx: true });
+    await redis.set(`app:user:apikey:${m.teamId}`, m.userId, { nx: true });
+  }
+}
+
+export async function getMembership(
+  userId: string,
+  teamId: string,
+): Promise<MembershipRecord | null> {
+  const raw = await redis.get<string>(membershipKey(userId, teamId));
+  if (!raw) return null;
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as MembershipRecord;
+}
+
+export async function removeMembership(userId: string, teamId: string): Promise<void> {
+  await redis.del(membershipKey(userId, teamId));
+  await redis.srem(`app:team:${teamId}:members`, userId);
+  await redis.srem(`app:user:${userId}:teams`, teamId);
+
+  const ownerId = await redis.get<string>(`app:team:${teamId}:owner`);
+  if (ownerId === userId) {
+    await redis.del(`app:team:${teamId}:owner`);
+    const legacy = await redis.get<string>(`app:user:apikey:${teamId}`);
+    if (legacy === userId) await redis.del(`app:user:apikey:${teamId}`);
+  }
+}
+
+export async function listUserTeamIds(userId: string): Promise<string[]> {
+  return redis.smembers(`app:user:${userId}:teams`);
+}
+
+export async function listTeamMemberIds(teamId: string): Promise<string[]> {
+  return redis.smembers(`app:team:${teamId}:members`);
+}
+
+export async function countTeamOwners(teamId: string): Promise<number> {
+  const ids = await listTeamMemberIds(teamId);
+  let n = 0;
+  for (const id of ids) {
+    const m = await getMembership(id, teamId);
+    if (m?.role === "owner") n++;
+  }
+  return n;
+}
+
+/**
+ * Find the user for this apiKey digest, or create a NEW person-record.
+ * Never attaches a teammate login onto another user's row / never overwrites
+ * another person's apiKey just because they share a teamId.
+ */
+export async function findOrCreateUserForApiKey(
+  apiKey: string,
+  teamId: string,
+  extras?: Partial<Pick<UserRecord, "email" | "name" | "isOperator">>,
+): Promise<UserRecord> {
+  const byKey = await getUserByApiKey(apiKey);
+  if (byKey) {
+    const membership = await getMembership(byKey.id, teamId);
+    if (!membership) {
+      const ownerId = await getTeamOwnerId(teamId);
+      const role = ownerId && ownerId !== byKey.id ? "member" : "owner";
+      await upsertMembership({
+        userId: byKey.id,
+        teamId,
+        role,
+        createdAt: new Date().toISOString(),
+      });
+    }
+    // Repair empty apiKey after decrypt failure — same person's key only.
+    if (!byKey.apiKey) {
+      await updateUser(byKey.id, { apiKey, teamId });
+      return { ...byKey, apiKey, teamId };
+    }
+    if (byKey.teamId !== teamId) {
+      await updateUser(byKey.id, { teamId });
+      return { ...byKey, teamId };
+    }
+    return byKey;
+  }
+
+  // Optional: email already has a user joining via a teammate key.
+  if (extras?.email) {
+    const byEmail = await getUserByEmail(extras.email);
+    if (byEmail) {
+      await upsertMembership({
+        userId: byEmail.id,
+        teamId,
+        role: "member",
+        createdAt: new Date().toISOString(),
+      });
+      // Store THIS personal key on THEIR record only (not the owner's).
+      await updateUser(byEmail.id, { apiKey, teamId });
+      const methods = byEmail.authMethods.includes("apikey")
+        ? byEmail.authMethods
+        : ([...byEmail.authMethods, "apikey"] as UserRecord["authMethods"]);
+      if (methods !== byEmail.authMethods) {
+        await updateUser(byEmail.id, { authMethods: methods });
+      }
+      return { ...byEmail, apiKey, teamId, authMethods: methods };
+    }
+  }
+
+  const ownerId = await getTeamOwnerId(teamId);
+  const role: "owner" | "member" = ownerId ? "member" : "owner";
+
+  return createUser(
+    {
+      teamId,
+      apiKey,
+      email: extras?.email,
+      name: extras?.name,
+      isOperator: extras?.isOperator,
+      authMethods: ["apikey"],
+      createdAt: new Date().toISOString(),
+    },
+    { role },
+  );
+}
+
+/** Pending teammate invite: key digest → email so first login can attach email. */
+export async function savePendingTeammateInvite(
+  apiKey: string,
+  data: { email: string; teamId: string },
+): Promise<void> {
+  const key = `app:invite:keyhint:${apiKeyDigestHint(apiKey)}`;
+  await redis.set(key, JSON.stringify(data), { ex: 60 * 60 * 24 * 14 });
+}
+
+export async function takePendingTeammateInvite(
+  apiKey: string,
+): Promise<{ email: string; teamId: string } | null> {
+  const key = `app:invite:keyhint:${apiKeyDigestHint(apiKey)}`;
+  const raw = await redis.get<string>(key);
+  if (!raw) return null;
+  await redis.del(key);
+  return (typeof raw === "string" ? JSON.parse(raw) : raw) as {
+    email: string;
+    teamId: string;
+  };
 }
 
 // ---------------------------------------------------------------------------

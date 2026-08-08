@@ -3,9 +3,11 @@ import { createHash } from "crypto";
 import { z } from "zod";
 import { getServerIdentity, isOperator } from "@/lib/session";
 import {
+  createUser,
   deleteAccessDraft,
   getAccessDraft,
   getOrgInvite,
+  getUserByEmail,
   listOrgInvites,
   listWaitlist,
   markOrgInviteRevoked,
@@ -19,12 +21,20 @@ import {
   getUserByTeamId,
   disableUser,
   deleteUser,
+  EmailTakenError,
   type AccessSource,
 } from "@/lib/redis";
-import { provisionTeamKey, revokeAdminKey, revokeAllTeamKeys } from "@/lib/roomd";
-import { waitlistTeamId } from "@/lib/teams";
+import {
+  provisionTeamKey,
+  purgeTeamRooms,
+  revokeAdminKey,
+  revokeTeamAccess,
+} from "@/lib/roomd";
+import { emailTeamId } from "@/lib/teams";
 import { sendInviteEmail } from "@/lib/mail";
 import { buildInviteEmailHtml } from "@/lib/email/invite-template";
+import { createRedeemToken } from "@/lib/redeem";
+import { appendAudit } from "@/lib/audit";
 import { track, captureError } from "@/lib/telemetry";
 import type { OrgInviteEntry } from "@/types";
 
@@ -34,8 +44,8 @@ import type { OrgInviteEntry } from "@/types";
  * prepare  — mint key + draft (does NOT accept waitlist / does NOT deliver)
  * confirm  — Send email or Copy key → then mark accepted/delivered
  * abandon  — dialog closed without delivery → revoke minted key
- * disable  — revoke API key(s), keep the row (alias: revoke)
- * delete   — revoke keys and remove the invite/waitlist row (+ linked user if any)
+ * disable  — revoke API key(s) + invites, keep the row (alias: revoke)
+ * delete   — revoke keys/invites, purge rooms, remove the invite/waitlist row
  */
 
 const prepareSchema = z.object({
@@ -96,6 +106,16 @@ function hashSecret(secret: string): string {
   return createHash("sha256").update(secret).digest("hex");
 }
 
+function failClosed(route: string, err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error(`[${route}]`, message);
+  captureError(err, { route });
+  return NextResponse.json(
+    { ok: false, error: "Revocation incomplete — access not changed" },
+    { status: 502 },
+  );
+}
+
 export async function GET() {
   const identity = await getServerIdentity();
   if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -147,7 +167,42 @@ export async function POST(req: NextRequest) {
 
 async function prepare(email: string, source: AccessSource, mk: string) {
   try {
-    const key = await provisionTeamKey(waitlistTeamId(email), mk, email);
+    // Reuse teamId only from an in-flight draft. Never reuse a prior invited/
+    // waitlist teamId after delete (P0-3) — that reopened purged tenant data.
+    // Random emailTeamId() — never waitlistTeamId(email).
+    const existingDraft = await getAccessDraft(email);
+
+    // Identity v2 / P1-7: one email → one person. Allow re-prepare only when the
+    // existing row is the unfinished draft's pre-created user.
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      const draftOwned =
+        existingDraft &&
+        !existingDraft.confirmedAt &&
+        existingUser.teamId === existingDraft.teamId;
+      if (!draftOwned) {
+        return NextResponse.json(
+          { error: "A dashboard user already exists for this email" },
+          { status: 409 },
+        );
+      }
+    }
+
+    const teamId = existingDraft?.teamId ?? emailTeamId();
+
+    if (existingDraft?.keyId && !existingDraft.confirmedAt) {
+      try {
+        await revokeAdminKey(existingDraft.keyId, mk);
+      } catch (err) {
+        console.error("[access:prepare:revoke-draft]", err instanceof Error ? err.message : err);
+      }
+      // Drop the unused person row from a previous unfinished prepare.
+      if (existingUser && existingUser.teamId === existingDraft.teamId) {
+        await deleteUser(existingUser.id);
+      }
+    }
+
+    const key = await provisionTeamKey(teamId, mk, email);
     const draft = {
       email,
       source,
@@ -158,6 +213,26 @@ async function prepare(email: string, source: AccessSource, mk: string) {
       createdAt: new Date().toISOString(),
     };
     await saveAccessDraft(draft);
+
+    // Pre-create person + owner membership so register/OAuth unify onto this
+    // identity instead of minting a second team for the same email (P1-7).
+    try {
+      await createUser({
+        email,
+        teamId: key.teamId,
+        apiKey: key.secret,
+        authMethods: ["apikey"],
+        createdAt: draft.createdAt,
+      });
+    } catch (err) {
+      if (err instanceof EmailTakenError) {
+        return NextResponse.json(
+          { error: "A dashboard user already exists for this email" },
+          { status: 409 },
+        );
+      }
+      throw err;
+    }
 
     if (source === "direct") {
       const entry: OrgInviteEntry = {
@@ -171,19 +246,30 @@ async function prepare(email: string, source: AccessSource, mk: string) {
       await upsertOrgInvite(entry);
     }
 
+    const redeem = await createRedeemToken({
+      secret: key.secret,
+      teamId: key.teamId,
+      email,
+    });
     const who = "You have been invited";
     const scope = "You get a team workspace and can create rooms.";
     const url = loginUrl();
-    const html = buildInviteEmailHtml({ key: key.secret, loginUrl: url, who, scope });
+    const html = buildInviteEmailHtml({
+      redeemUrl: redeem.redeemUrl,
+      loginUrl: url,
+      who,
+      scope,
+    });
     const text =
       `${who} to roomd.\n\n` +
-      `Sign in at ${url} with this key:\n\n${key.secret}\n\n` +
-      `${scope} Keep the key somewhere safe.`;
+      `Open this one-time link to reveal your access key:\n\n${redeem.redeemUrl}\n\n` +
+      `Then sign in at ${url}.\n\n${scope}`;
 
     return NextResponse.json({
       email,
       source,
       secret: key.secret,
+      redeemUrl: redeem.redeemUrl,
       keyId: key.keyId,
       teamId: key.teamId,
       loginUrl: url,
@@ -227,7 +313,16 @@ async function confirm(
     let emailed = false;
     let reason: string | undefined;
     if (delivery === "email") {
-      const mail = await sendInviteEmail({ to: email, key: secret, loginUrl: loginUrl() });
+      const redeem = await createRedeemToken({
+        secret,
+        teamId: draft.teamId,
+        email,
+      });
+      const mail = await sendInviteEmail({
+        to: email,
+        redeemUrl: redeem.redeemUrl,
+        loginUrl: loginUrl(),
+      });
       emailed = mail.sent;
       reason = mail.reason;
       if (!emailed) {
@@ -295,12 +390,17 @@ async function abandon(email: string, mk: string) {
   try {
     const draft = await getAccessDraft(email);
     if (draft) {
-      // Already delivered via Copy — only drop the draft, keep the key.
+      // Already delivered via Copy — only drop the draft, keep the key + user.
       if (!draft.confirmedAt) {
         try {
           await revokeAdminKey(draft.keyId, mk);
         } catch (err) {
           console.error("[access:abandon:revoke]", err instanceof Error ? err.message : err);
+        }
+        // prepare() pre-creates the dashboard user — remove the unused person row.
+        const user = await getUserByEmail(email);
+        if (user && user.teamId === draft.teamId) {
+          await deleteUser(user.id);
         }
       }
       await deleteAccessDraft(email);
@@ -318,28 +418,54 @@ async function abandon(email: string, mk: string) {
   }
 }
 
-/** Disable = revoke keys, keep the history row. */
+/** Disable = revoke keys + invites, keep the history row. Fail closed. */
 async function disableAccess(email: string, source: AccessSource, mk: string) {
   try {
     const teamId = await resolveTeamId(email, source);
+    // Identity v2: act on the person (email), not the legacy team-owner index alone.
+    const user = (await getUserByEmail(email)) ?? (teamId ? await getUserByTeamId(teamId) : null);
+
     if (teamId) {
       try {
-        await revokeAllTeamKeys(teamId, mk);
+        await revokeTeamAccess(teamId, mk);
       } catch (err) {
-        console.error("[access:disable:keys]", err instanceof Error ? err.message : err);
+        return failClosed("access:disable:revoke", err);
       }
-      const user = await getUserByTeamId(teamId);
       if (user) await disableUser(user.id);
     } else if (source === "direct") {
       const invite = await getOrgInvite(email);
-      if (invite?.keyId) await revokeAdminKey(invite.keyId, mk);
+      if (invite?.keyId) {
+        try {
+          await revokeAdminKey(invite.keyId, mk);
+        } catch (err) {
+          return failClosed("access:disable:key", err);
+        }
+      }
+      if (user) await disableUser(user.id);
     } else {
       const entry = (await listWaitlist()).find((e) => e.email === email);
-      if (entry?.keyId) await revokeAdminKey(entry.keyId, mk);
+      if (entry?.keyId) {
+        try {
+          await revokeAdminKey(entry.keyId, mk);
+        } catch (err) {
+          return failClosed("access:disable:key", err);
+        }
+      }
+      if (user) await disableUser(user.id);
     }
 
     if (source === "direct") await markOrgInviteRevoked(email);
     else await markWaitlistRevoked(email);
+
+    await appendAudit({
+      actorUserId: null,
+      actorTeamId: null,
+      action: "user.disable",
+      targetTeamId: teamId ?? undefined,
+      targetUserId: user?.id,
+      targetEmail: email,
+      meta: { source },
+    });
 
     return NextResponse.json({ ok: true, email, action: "disable" });
   } catch (err) {
@@ -348,40 +474,59 @@ async function disableAccess(email: string, source: AccessSource, mk: string) {
   }
 }
 
-/** Delete = revoke keys and remove the row (and linked dashboard user). */
+/** Delete = revoke keys/invites, purge rooms, remove row + linked user. Fail closed. */
 async function deleteAccess(email: string, source: AccessSource, mk: string) {
   try {
     const teamId = await resolveTeamId(email, source);
+    // Identity v2: delete the specific person record for this email.
+    const user = (await getUserByEmail(email)) ?? (teamId ? await getUserByTeamId(teamId) : null);
+
     if (teamId) {
       try {
-        await revokeAllTeamKeys(teamId, mk);
+        await revokeTeamAccess(teamId, mk);
       } catch (err) {
-        console.error("[access:delete:keys]", err instanceof Error ? err.message : err);
+        return failClosed("access:delete:revoke", err);
       }
-      const user = await getUserByTeamId(teamId);
+      try {
+        await purgeTeamRooms(teamId, mk);
+      } catch (err) {
+        return failClosed("access:delete:purge", err);
+      }
       if (user) await deleteUser(user.id);
     } else if (source === "direct") {
       const invite = await getOrgInvite(email);
       if (invite?.keyId) {
         try {
           await revokeAdminKey(invite.keyId, mk);
-        } catch {
-          /* already gone */
+        } catch (err) {
+          return failClosed("access:delete:key", err);
         }
       }
+      if (user) await deleteUser(user.id);
     } else {
       const entry = (await listWaitlist()).find((e) => e.email === email);
       if (entry?.keyId) {
         try {
           await revokeAdminKey(entry.keyId, mk);
-        } catch {
-          /* already gone */
+        } catch (err) {
+          return failClosed("access:delete:key", err);
         }
       }
+      if (user) await deleteUser(user.id);
     }
 
     if (source === "direct") await deleteOrgInvite(email);
     else await removeFromWaitlist(email);
+
+    await appendAudit({
+      actorUserId: null,
+      actorTeamId: null,
+      action: "user.delete",
+      targetTeamId: teamId ?? undefined,
+      targetUserId: user?.id,
+      targetEmail: email,
+      meta: { source },
+    });
 
     return NextResponse.json({ ok: true, email, action: "delete" });
   } catch (err) {

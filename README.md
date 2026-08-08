@@ -15,4 +15,13 @@ npm run dev   # http://localhost:3011
 
 Needs the same Upstash Redis as the API, and a running roomd (or a deployed `ROOMD_URL`).
 
+## Invite redeem flow
+
+Operator and teammate invites never email the long-lived API key. Instead:
+
+1. Prepare/invite mints a key and stores a one-hour Redis token at `app:redeem:{token}`.
+2. The email contains only `/redeem/{token}` (also available as `GET /api/redeem/{token}`).
+3. Opening the link returns the secret **once**, then deletes the token.
+4. Owner UI `prepare` may still return `secret` + `redeemUrl` for clipboard copy.
+
 Deploy notes: `../docs/DEPLOY.md`.

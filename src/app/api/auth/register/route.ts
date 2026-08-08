@@ -5,6 +5,7 @@ import {
   getUserByEmail,
   getWaitlistEntry,
   getOrgInvite,
+  updateUser,
 } from "@/lib/redis";
 import { provisionTeamKey } from "@/lib/roomd";
 import { hashPassword } from "@/lib/password";
@@ -24,6 +25,9 @@ const schema = z.object({
  *
  * Creates an email/password account and provisions an isolated roomd team.
  * Invite-only unless ALLOW_OPEN_SIGNUP=true.
+ *
+ * Identity v2 / P1-7: if the email already has a user (e.g. from access prepare),
+ * link the password to that record — never mint a second team for the same human.
  */
 export async function POST(req: NextRequest) {
   if (AUTH_MODE === "apikey") {
@@ -67,14 +71,41 @@ export async function POST(req: NextRequest) {
 
   const existing = await getUserByEmail(email);
   if (existing) {
-    return NextResponse.json({ error: "Could not create account" }, { status: 409 });
+    if (existing.disabledAt) {
+      return NextResponse.json({ error: "Could not create account" }, { status: 403 });
+    }
+    if (existing.passwordHash) {
+      return NextResponse.json({ error: "Could not create account" }, { status: 409 });
+    }
+    try {
+      const passwordHash = await hashPassword(parsed.password);
+      const authMethods = existing.authMethods.includes("email")
+        ? existing.authMethods
+        : ([...existing.authMethods, "email"] as typeof existing.authMethods);
+      await updateUser(existing.id, {
+        passwordHash,
+        name: parsed.name ?? existing.name,
+        authMethods,
+      });
+      track("register_linked", { teamId: existing.teamId });
+      return NextResponse.json({ ok: true }, { status: 201 });
+    } catch (err) {
+      captureError(err, { route: "register:link" });
+      return NextResponse.json({ error: "Could not create account" }, { status: 500 });
+    }
   }
 
   try {
     const masterKey = process.env.ROOMD_MASTER_KEY;
     if (!masterKey) throw new Error("ROOMD_MASTER_KEY is not configured");
 
-    const keyData = await provisionTeamKey(emailTeamId(), masterKey, email);
+    // Prefer team id already stored on the invite/waitlist entry (from prepare).
+    const wait = await getWaitlistEntry(email);
+    const org = await getOrgInvite(email);
+    const invitedTeamId = wait?.teamId ?? org?.teamId;
+    const teamId = invitedTeamId || emailTeamId();
+
+    const keyData = await provisionTeamKey(teamId, masterKey, email);
     const passwordHash = await hashPassword(parsed.password);
 
     await createUser({

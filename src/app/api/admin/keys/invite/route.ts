@@ -1,22 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getServerIdentity } from "@/lib/session";
-import { createAdminKey } from "@/lib/roomd";
+import { getServerIdentity, isOperator } from "@/lib/session";
+import { createAdminKey, listAdminKeys } from "@/lib/roomd";
 import { sendInviteEmail } from "@/lib/mail";
+import { createRedeemToken } from "@/lib/redeem";
+import { checkWebRateLimit, clientIp, rateLimitBucket } from "@/lib/ratelimit";
+import { limitsForPlan } from "@/lib/plans";
+import {
+  getUserByEmail,
+  getUserById,
+  listTeamMemberIds,
+  savePendingTeammateInvite,
+  updateUser,
+  upsertMembership,
+} from "@/lib/redis";
 import { track, captureError } from "@/lib/telemetry";
 
 const schema = z.object({ email: z.string().trim().email().max(254) });
+
+const HOUR = 60 * 60;
 
 /**
  * POST invite a teammate to YOUR org.
  *
  * Creates a dynamic key under the caller's own team (so the teammate shares the
- * caller's rooms) and emails it to them if SMTP is configured. Any logged-in
- * user can invite into their own team; this is not operator-gated.
+ * caller's rooms) and emails a redeem link if SMTP is configured.
+ *
+ * Identity v2: does NOT share/overwrite the caller's user record. Optionally
+ * attaches membership to an existing email user, or stores a pending invite so
+ * first apiKey login creates a distinct person-record.
+ *
+ * Operator accounts cannot invite teammates onto the operator team (P0-1 / CTO freeze).
  */
 export async function POST(req: NextRequest) {
   const identity = await getServerIdentity();
   if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (isOperator(identity)) {
+    return NextResponse.json(
+      {
+        error:
+          "Operator team cannot invite teammates until identity v2 seat controls are enabled",
+      },
+      { status: 403 },
+    );
+  }
 
   let email: string;
   try {
@@ -25,12 +52,69 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email" }, { status: 400 });
   }
 
+  const ip = clientIp(req);
+  const [ipLimit, teamLimit] = await Promise.all([
+    checkWebRateLimit(rateLimitBucket("invite-ip", ip), 10, HOUR),
+    checkWebRateLimit(rateLimitBucket("invite-team", identity.teamId), 5, HOUR),
+  ]);
+  if (!ipLimit.allowed || !teamLimit.allowed) {
+    return NextResponse.json({ error: "Too many invites — try again later" }, { status: 429 });
+  }
+
   try {
+    const user = await getUserById(identity.userId);
+    const limits = limitsForPlan(user?.plan);
+    const existingKeys = await listAdminKeys(identity.apiKey);
+    if (existingKeys.length >= limits.maxKeys) {
+      return NextResponse.json(
+        { error: `Team key limit reached (${limits.maxKeys})` },
+        { status: 403 },
+      );
+    }
+
+    const memberIds = await listTeamMemberIds(identity.teamId);
+    if (memberIds.length >= limits.maxTeammates) {
+      return NextResponse.json(
+        { error: `Team seat limit reached (${limits.maxTeammates})` },
+        { status: 403 },
+      );
+    }
+
     const key = await createAdminKey(identity.apiKey, `Teammate: ${email}`);
+
+    const existing = await getUserByEmail(email);
+    if (existing) {
+      // Attach membership; store their personal apiKey on THEIR user only.
+      await upsertMembership({
+        userId: existing.id,
+        teamId: identity.teamId,
+        role: "member",
+        createdAt: new Date().toISOString(),
+      });
+      await updateUser(existing.id, {
+        apiKey: key.secret,
+        teamId: identity.teamId,
+        authMethods: existing.authMethods.includes("apikey")
+          ? existing.authMethods
+          : [...existing.authMethods, "apikey"],
+      });
+    } else {
+      // First login with this key will create a distinct user + attach email.
+      await savePendingTeammateInvite(key.secret, {
+        email,
+        teamId: identity.teamId,
+      });
+    }
+
     const loginUrl = `${process.env.NEXTAUTH_URL ?? ""}/login`;
+    const redeem = await createRedeemToken({
+      secret: key.secret,
+      teamId: key.teamId,
+      email,
+    });
     const mail = await sendInviteEmail({
       to: email,
-      key: key.secret,
+      redeemUrl: redeem.redeemUrl,
       loginUrl,
       context: "team",
     });
@@ -39,7 +123,22 @@ export async function POST(req: NextRequest) {
       teamId: identity.teamId,
       emailed: mail.sent,
     });
-    return NextResponse.json({ email, secret: key.secret, emailed: mail.sent });
+
+    if (mail.sent) {
+      return NextResponse.json({
+        email,
+        emailed: true,
+        redeemUrl: redeem.redeemUrl,
+      });
+    }
+
+    return NextResponse.json({
+      email,
+      secret: key.secret,
+      emailed: false,
+      redeemUrl: redeem.redeemUrl,
+      warning: "copy now",
+    });
   } catch (err) {
     captureError(err, { route: "keys:invite", userId: identity.userId });
     return NextResponse.json({ error: "Failed to invite teammate" }, { status: 500 });

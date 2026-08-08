@@ -6,12 +6,15 @@ export async function POST(req: NextRequest) {
   const identity = await getServerIdentity();
   if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { note } = (await req.json().catch(() => ({}))) as { note?: string };
+  const { note, boundAgentId } = (await req.json().catch(() => ({}))) as {
+    note?: string;
+    boundAgentId?: string;
+  };
 
   try {
     // The new secret is returned once, to be copied by the operator. It is not
-    // persisted anywhere in roomd-web.
-    const key = await createAdminKey(identity.apiKey, note);
+    // persisted anywhere in roomd-web. boundAgentId is required for approve/reject.
+    const key = await createAdminKey(identity.apiKey, note, boundAgentId);
     return NextResponse.json(key, { status: 201 });
   } catch (err) {
     console.error("[keys:create]", err instanceof Error ? err.message : err);

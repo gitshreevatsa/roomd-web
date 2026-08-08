@@ -1,6 +1,8 @@
 /**
  * Branded HTML for roomd invite emails.
  * Table-based layout for email client compatibility (similar to react-email).
+ *
+ * Emails carry a single-use redeem link — never the long-lived API key.
  */
 
 const PRIMARY = "#1a9e48";
@@ -12,17 +14,17 @@ const BORDER = "#e7e5e4";
 const BG = "#f4f4f5";
 
 export function buildInviteEmailHtml(args: {
-  key: string;
+  redeemUrl: string;
   loginUrl: string;
   who: string;
   scope: string;
   preheader?: string;
 }): string {
-  const { key, loginUrl, who, scope } = args;
+  const { redeemUrl, loginUrl, who, scope } = args;
   const preheader =
-    args.preheader ?? "Transactional access key for your roomd workspace.";
+    args.preheader ?? "Open this link once to reveal your roomd access key.";
   const site = "https://roomd.sh";
-  const safeKey = escapeHtml(key);
+  const safeRedeem = escapeHtml(redeemUrl);
   const safeLogin = escapeHtml(loginUrl);
   const safeWho = escapeHtml(who);
   const safeScope = escapeHtml(scope);
@@ -33,7 +35,7 @@ export function buildInviteEmailHtml(args: {
   <meta content="text/html; charset=UTF-8" http-equiv="Content-Type"/>
   <meta name="x-apple-disable-message-reformatting"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>roomd access key</title>
+  <title>roomd access</title>
 </head>
 <body style="background-color:${BG};margin:0;padding:0">
   <div style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0">
@@ -94,24 +96,31 @@ export function buildInviteEmailHtml(args: {
                                     <tbody>
                                       <tr>
                                         <td style="padding:18px 20px">
-                                          <p style="font-size:12px;line-height:1.4;color:${MUTED};font-weight:600;letter-spacing:0.04em;margin:0 0 8px;text-transform:uppercase">Your API key</p>
-                                          <p style="font-size:14px;line-height:1.5;color:${INK};font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;margin:0;word-break:break-all">${safeKey}</p>
+                                          <p style="font-size:12px;line-height:1.4;color:${MUTED};font-weight:600;letter-spacing:0.04em;margin:0 0 8px;text-transform:uppercase">Reveal your key</p>
+                                          <p style="font-size:14px;line-height:1.5;color:${INK};margin:0">This one-time link shows your API key once. It expires in an hour.</p>
                                         </td>
                                       </tr>
                                     </tbody>
                                   </table>
 
-                                  <p style="font-size:14px;line-height:1.6;color:${MUTED};margin:16px 0 0">Keep this key somewhere safe. Anyone with it can access your workspace.</p>
+                                  <p style="font-size:14px;line-height:1.6;color:${MUTED};margin:16px 0 0">After you copy the key, sign in at the login page. Anyone with the key can access the workspace.</p>
 
                                   <table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="padding-top:26px">
                                     <tbody>
                                       <tr>
                                         <td>
-                                          <a href="${safeLogin}" style="color:#ffffff;background-color:${PRIMARY};border-radius:8px;display:inline-block;font-size:15px;font-weight:600;padding:13px 24px;text-decoration:none" target="_blank">Sign in to roomd&nbsp;→</a>
+                                          <a href="${safeRedeem}" style="color:#ffffff;background-color:${PRIMARY};border-radius:8px;display:inline-block;font-size:15px;font-weight:600;padding:13px 24px;text-decoration:none" target="_blank">Reveal access key&nbsp;→</a>
                                         </td>
                                       </tr>
                                     </tbody>
                                   </table>
+
+                                  <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:18px 0 0;word-break:break-all">
+                                    Or open: <a href="${safeRedeem}" style="color:${MUTED}" target="_blank">${safeRedeem}</a>
+                                  </p>
+                                  <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:8px 0 0">
+                                    Sign in: <a href="${safeLogin}" style="color:${MUTED}" target="_blank">${safeLogin}</a>
+                                  </p>
                                 </td>
                               </tr>
                             </tbody>

@@ -7,22 +7,25 @@ const redis = new Redis({
 });
 
 /**
- * Fixed-window rate limit (per key, per minute).
+ * Fixed-window rate limit (per bucket).
+ * Default window is 60s; pass `windowSeconds` for hourly caps (e.g. invites).
  * Fails open if Redis is unreachable so auth stays available.
  */
 export async function checkWebRateLimit(
   bucket: string,
-  limitPerMinute: number,
+  limit: number,
+  windowSeconds = 60,
 ): Promise<{ allowed: boolean; remaining: number }> {
   try {
-    const window = Math.floor(Date.now() / 60_000);
-    const key = `app:ratelimit:${bucket}:${window}`;
+    const windowMs = Math.max(1, windowSeconds) * 1000;
+    const window = Math.floor(Date.now() / windowMs);
+    const key = `app:ratelimit:${bucket}:${windowSeconds}:${window}`;
     const count = await redis.incr(key);
-    if (count === 1) await redis.expire(key, 120);
-    const remaining = Math.max(0, limitPerMinute - count);
-    return { allowed: count <= limitPerMinute, remaining };
+    if (count === 1) await redis.expire(key, Math.max(windowSeconds * 2, 120));
+    const remaining = Math.max(0, limit - count);
+    return { allowed: count <= limit, remaining };
   } catch {
-    return { allowed: true, remaining: limitPerMinute };
+    return { allowed: true, remaining: limit };
   }
 }
 

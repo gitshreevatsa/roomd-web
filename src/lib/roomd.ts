@@ -208,21 +208,32 @@ interface AdminEndpointResponse {
 
 export async function createAdminKey(
   apiKey: string,
-  note?: string
-): Promise<{ keyId: string; secret: string; teamId: string; createdAt: string }> {
+  note?: string,
+  boundAgentId?: string,
+): Promise<{
+  keyId: string;
+  secret: string;
+  teamId: string;
+  createdAt: string;
+  boundAgentId?: string;
+}> {
+  const body: { note?: string; boundAgentId?: string } = {};
+  if (note) body.note = note;
+  if (boundAgentId?.trim()) body.boundAgentId = boundAgentId.trim();
   const res = await fetch(`${ROOMD_URL}/admin/keys`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(note ? { note } : {}),
+    body: JSON.stringify(body),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`createAdminKey failed: ${res.status}`);
-  const data = await res.json() as AdminEndpointResponse;
+  const data = await res.json() as AdminEndpointResponse & { boundAgentId?: string };
   return {
     keyId: data.keyId!,
     secret: data.secret!,
     teamId: data.teamId!,
     createdAt: data.createdAt!,
+    boundAgentId: data.boundAgentId,
   };
 }
 
@@ -305,6 +316,135 @@ export async function revokeAllTeamKeys(
     n++;
   }
   return n;
+}
+
+/**
+ * Revoke the dyn key that matches this user's personal apiKey (by hint).
+ * Used for member self-delete — does not wipe the whole team.
+ */
+export async function revokeUserApiKey(
+  teamId: string,
+  apiKey: string,
+  masterKey: string,
+): Promise<boolean> {
+  if (!apiKey) return false;
+  const hint = `****${apiKey.slice(-4)}`;
+  const keys = await listTeamKeys(teamId, masterKey);
+  const match = keys.find((k) => k.hint === hint);
+  if (!match) return false;
+  await revokeAdminKey(match.keyId, masterKey);
+  return true;
+}
+
+/**
+ * List rooms owned by the authenticated team (`GET /admin/rooms`).
+ * With a team key this returns that team's rooms; with a master key it returns
+ * the operator team's rooms (not useful for offboarding another tenant).
+ */
+export async function listTeamRooms(apiKey: string): Promise<string[]> {
+  const res = await fetch(`${ROOMD_URL}/admin/rooms`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`listTeamRooms failed: ${res.status}`);
+  const data = (await res.json()) as { rooms?: string[] };
+  return data.rooms ?? [];
+}
+
+/** Operator-only: list rooms for any team (`GET /admin/teams/:teamId/rooms`). */
+export async function listTeamRoomsForTeam(
+  teamId: string,
+  masterKey: string,
+): Promise<string[]> {
+  const res = await fetch(
+    `${ROOMD_URL}/admin/teams/${encodeURIComponent(teamId)}/rooms`,
+    {
+      headers: { Authorization: `Bearer ${masterKey}` },
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) throw new Error(`listTeamRoomsForTeam failed: ${res.status}`);
+  const data = (await res.json()) as { rooms?: string[] };
+  return data.rooms ?? [];
+}
+
+/**
+ * Revoke every room invite for a team.
+ * Prefers `DELETE /admin/teams/:teamId/invites`; falls back to
+ * list rooms → list invites → revoke each.
+ */
+export async function revokeAllTeamInvites(
+  teamId: string,
+  masterOrTeamKey: string,
+): Promise<number> {
+  const bulk = await fetch(
+    `${ROOMD_URL}/admin/teams/${encodeURIComponent(teamId)}/invites`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${masterOrTeamKey}` },
+      cache: "no-store",
+    },
+  );
+  if (bulk.ok) {
+    const data = (await bulk.json()) as { revoked?: number };
+    return data.revoked ?? 0;
+  }
+  // Endpoint missing or not authorized — fall back to per-room revoke.
+  if (bulk.status !== 404 && bulk.status !== 405) {
+    throw new Error(`revokeAllTeamInvites failed: ${bulk.status}`);
+  }
+
+  let rooms: string[];
+  try {
+    rooms = await listTeamRoomsForTeam(teamId, masterOrTeamKey);
+  } catch {
+    rooms = await listTeamRooms(masterOrTeamKey);
+  }
+
+  let n = 0;
+  for (const roomId of rooms) {
+    const invites = await listRoomInvites(roomId, masterOrTeamKey);
+    for (const inv of invites) {
+      await revokeRoomInvite(inv.tokenId, roomId, masterOrTeamKey);
+      n++;
+    }
+  }
+  return n;
+}
+
+/**
+ * Purge all rooms owned by a team (`DELETE /admin/teams/:teamId/rooms`).
+ * Throws if the endpoint is missing so callers can decide fail-closed vs TODO.
+ */
+export async function purgeTeamRooms(
+  teamId: string,
+  masterOrTeamKey: string,
+): Promise<number> {
+  const res = await fetch(
+    `${ROOMD_URL}/admin/teams/${encodeURIComponent(teamId)}/rooms`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${masterOrTeamKey}` },
+      cache: "no-store",
+    },
+  );
+  if (res.status === 404 || res.status === 405) {
+    // TODO(roomd): require DELETE /admin/teams/:teamId/rooms for offboarding purge.
+    throw new Error("purgeTeamRooms endpoint not available");
+  }
+  if (!res.ok) throw new Error(`purgeTeamRooms failed: ${res.status}`);
+  const data = (await res.json()) as { purged?: number };
+  return data.purged ?? 0;
+}
+
+/** Revoke keys + invites for a team. Either failure throws (fail closed). */
+export async function revokeTeamAccess(
+  teamId: string,
+  masterOrTeamKey: string,
+): Promise<{ keys: number; invites: number }> {
+  const keys = await revokeAllTeamKeys(teamId, masterOrTeamKey);
+  const invites = await revokeAllTeamInvites(teamId, masterOrTeamKey);
+  return { keys, invites };
 }
 
 // ---------------------------------------------------------------------------

@@ -24,18 +24,17 @@ export function oauthTeamId(provider: "google" | "github", externalId: string): 
   return `oauth-${provider}-${digest}`;
 }
 
-/** A teamId for a fresh email signup. Random, since there is no external id. */
+/** A teamId for a fresh email signup or waitlist/org invite. Random each call. */
 export function emailTeamId(): string {
   const suffix = nanoid(16).toLowerCase().replace(/[^a-z0-9]/g, "0");
   return `team-${suffix}`;
 }
 
 /**
- * A teamId for a waitlisted email the operator invites.
- *
- * Deterministic in the email, so inviting the same person twice targets the same
- * isolated team (a re-issued key lands them back in their own workspace, not a
- * new empty one).
+ * @deprecated Do not use for new provisioning. Deterministic email→teamId let
+ * re-invites after delete reopen the prior tenant's roomd data (P0-3).
+ * Kept only for migration / lookup of OLD waitlist teams that were minted with
+ * this hash before random `emailTeamId()` became the default.
  */
 export function waitlistTeamId(email: string): string {
   const digest = createHash("sha256")

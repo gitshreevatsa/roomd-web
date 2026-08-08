@@ -10,13 +10,14 @@ import {
   listOrgInvites,
   listWaitlist,
 } from "@/lib/redis";
-import { revokeAllTeamKeys } from "@/lib/roomd";
+import { purgeTeamRooms, revokeTeamAccess } from "@/lib/roomd";
 
 /**
  * Operator directory of dashboard users / orgs.
- * disable — revoke roomd keys + block login (keep row)
+ * disable — revoke roomd keys + invites + block login (keep row)
  * enable  — clear disabled flag
- * delete  — revoke keys + remove user row
+ * delete  — revoke keys/invites, purge rooms, remove user row
+ * Fail closed on revoke/purge errors.
  */
 
 const actionSchema = z.object({
@@ -85,9 +86,17 @@ export async function POST(req: NextRequest) {
   const user = await getUserById(body.userId);
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-  // Never let the operator disable/delete their own operator session accidentally
-  // via wiping the master-key account if it somehow shares an id — skip if same key.
-  if (user.apiKey === master && body.action !== "enable") {
+  // Identity v2: protect operator accounts by explicit flag / break-glass ids,
+  // not by comparing the stored apiKey to ROOMD_MASTER_KEY.
+  const breakGlass = new Set(
+    (process.env.OPERATOR_USER_IDS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+  const targetIsOperator =
+    user.isOperator === true || breakGlass.has(user.id) || user.id === identity.userId;
+  if (targetIsOperator && body.action !== "enable") {
     return NextResponse.json({ error: "Cannot disable or delete the operator account" }, { status: 400 });
   }
 
@@ -98,14 +107,33 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      await revokeAllTeamKeys(user.teamId, master);
+      await revokeTeamAccess(user.teamId, master);
     } catch (err) {
-      console.error("[users:keys]", err instanceof Error ? err.message : err);
+      console.error("[users:revoke]", err instanceof Error ? err.message : err);
+      return NextResponse.json(
+        { ok: false, error: "Revocation incomplete — user not changed" },
+        { status: 502 },
+      );
     }
 
     if (body.action === "disable") {
       await disableUser(user.id);
       return NextResponse.json({ ok: true, action: "disable" });
+    }
+
+    try {
+      await purgeTeamRooms(user.teamId, master);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("not available")) {
+        console.error("[users:purge] TODO: purge endpoint unavailable", msg);
+      } else {
+        console.error("[users:purge]", msg);
+        return NextResponse.json(
+          { ok: false, error: "Room purge failed — user not deleted" },
+          { status: 502 },
+        );
+      }
     }
 
     await deleteUser(user.id);

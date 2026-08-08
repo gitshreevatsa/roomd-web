@@ -64,12 +64,34 @@ export interface UserRecord {
   email?: string;
   name?: string;
   passwordHash?: string;
+  /** Primary / active team (convenience). Memberships are the source of truth. */
   teamId: string;
+  /** This user's own roomd bearer key — never overwritten by another person's login. */
   apiKey: string;
   authMethods: ("apikey" | "email" | "google" | "github")[];
   createdAt: string;
   /** Operator disabled the account; dashboard login blocked until cleared. */
   disabledAt?: string;
+  /**
+   * Explicit platform-operator flag (Identity v2).
+   * Authorisation uses this flag (plus OPERATOR_USER_IDS break-glass), not a
+   * live compare of apiKey === ROOMD_MASTER_KEY.
+   */
+  isOperator?: boolean;
+  /** Billing plan for hard caps / Stripe. */
+  plan?: "free" | "team" | "enterprise";
+  stripeCustomerId?: string;
+  /** Hex-encoded TOTP secret when operator MFA is enrolled. */
+  totpSecret?: string;
+  totpEnabledAt?: string;
+}
+
+/** User ↔ Team join (Identity v2). One human can belong to multiple teams. */
+export interface MembershipRecord {
+  userId: string;
+  teamId: string;
+  role: "owner" | "member";
+  createdAt: string;
 }
 
 export interface RoomMeta {
@@ -86,6 +108,8 @@ export interface DynKey {
   teamId: string;
   createdAt: string;
   note?: string;
+  /** Credential-bound agent id for review/approve (roomd). */
+  boundAgentId?: string;
 }
 
 export interface InviteToken {
