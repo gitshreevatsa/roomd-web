@@ -59,6 +59,7 @@ export function AppNav({ showOwner }: { showOwner: boolean }) {
         match={(p) => p === "/dashboard" || p.startsWith("/rooms")}
       />
       <NavItem href="/admin" label="Admin" />
+      <NavItem href="/account" label="Account" />
       {showOwner && <NavItem href="/owner" label="Owner" />}
       <a
         href={DOCS_URL}

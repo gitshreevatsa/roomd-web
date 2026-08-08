@@ -15,10 +15,10 @@ export function DeleteAccountButton({
   return (
     <>
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
         type="button"
-        className="text-muted-foreground hover:text-destructive"
+        className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
         onClick={() => setOpen(true)}
       >
         Delete account

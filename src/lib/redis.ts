@@ -402,6 +402,12 @@ export async function createRoom(meta: RoomMeta): Promise<void> {
   await redis.sadd("app:rooms:all", meta.roomId);
 }
 
+/** Attach an existing room id to a user's dashboard index (Identity v2 repair). */
+export async function linkRoomToUser(userId: string, roomId: string): Promise<void> {
+  await redis.sadd(`app:rooms:${userId}`, roomId);
+  await redis.sadd("app:rooms:all", roomId);
+}
+
 /** Every user record. Operator analytics only. */
 export async function getAllUsers(): Promise<UserRecord[]> {
   const ids = await redis.smembers("app:users");
