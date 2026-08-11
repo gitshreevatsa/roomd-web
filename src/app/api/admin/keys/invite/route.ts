@@ -3,7 +3,6 @@ import { z } from "zod";
 import { getServerIdentity, isOperator } from "@/lib/session";
 import { createAdminKey, listAdminKeys } from "@/lib/roomd";
 import { sendInviteEmail } from "@/lib/mail";
-import { createRedeemToken } from "@/lib/redeem";
 import { checkWebRateLimit, clientIp, rateLimitBucket } from "@/lib/ratelimit";
 import { limitsForPlan } from "@/lib/plans";
 import {
@@ -24,7 +23,7 @@ const HOUR = 60 * 60;
  * POST invite a teammate to YOUR org.
  *
  * Creates a dynamic key under the caller's own team (so the teammate shares the
- * caller's rooms) and emails a redeem link if SMTP is configured.
+ * caller's rooms) and emails the API key if SMTP is configured.
  *
  * Identity v2: does NOT share/overwrite the caller's user record. Optionally
  * attaches membership to an existing email user, or stores a pending invite so
@@ -109,14 +108,9 @@ export async function POST(req: NextRequest) {
     }
 
     const loginUrl = `${process.env.NEXTAUTH_URL ?? ""}/login`;
-    const redeem = await createRedeemToken({
-      secret: key.secret,
-      teamId: key.teamId,
-      email,
-    });
     const mail = await sendInviteEmail({
       to: email,
-      redeemUrl: redeem.redeemUrl,
+      apiKey: key.secret,
       loginUrl,
       context: "team",
     });
@@ -130,7 +124,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         email,
         emailed: true,
-        redeemUrl: redeem.redeemUrl,
       });
     }
 
@@ -138,7 +131,6 @@ export async function POST(req: NextRequest) {
       email,
       secret: key.secret,
       emailed: false,
-      redeemUrl: redeem.redeemUrl,
       warning: "copy now",
     });
   } catch (err) {

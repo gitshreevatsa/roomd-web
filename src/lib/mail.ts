@@ -21,7 +21,7 @@ import { buildInviteEmailHtml } from "@/lib/email/invite-template";
  * Deliverability: SMTP_FROM must use a domain with SPF/DKIM/DMARC aligned to
  * the sending provider (e.g. Resend). Do not send as @roomd.sh through Gmail.
  *
- * Invite emails carry a single-use redeem URL only — never the raw API key.
+ * Invite emails include the API key so invitees can find it later in their inbox.
  */
 
 let cached: Transporter | null | undefined;
@@ -112,17 +112,17 @@ export async function sendMail({ to, subject, text, html, loginUrl }: SendArgs):
 }
 
 /**
- * Compose and send an invite email with a one-time redeem link (never the raw key).
+ * Compose and send an invite email that includes the API key (and a sign-in link).
  * Used both when the operator invites an org and when an org invites a teammate.
  */
 export async function sendInviteEmail(args: {
   to: string;
-  redeemUrl: string;
+  apiKey: string;
   loginUrl: string;
   invitedBy?: string;
   context?: "workspace" | "team";
 }): Promise<MailResult> {
-  const { to, redeemUrl, loginUrl, invitedBy, context = "workspace" } = args;
+  const { to, apiKey, loginUrl, invitedBy, context = "workspace" } = args;
   const who = invitedBy ? `${invitedBy} invited you` : "You have been invited";
   const scope =
     context === "team"
@@ -131,17 +131,16 @@ export async function sendInviteEmail(args: {
 
   const text =
     `${who} to roomd.\n\n` +
-    `Open this one-time link to reveal your access key (expires in 1 hour):\n\n` +
-    `${redeemUrl}\n\n` +
-    `Then sign in at ${loginUrl}.\n\n` +
     `${scope}\n\n` +
+    `Your API key (keep this email):\n${apiKey}\n\n` +
+    `Sign in at ${loginUrl} and paste the key.\n\n` +
     `— roomd (https://roomd.sh)`;
 
-  const html = buildInviteEmailHtml({ redeemUrl, loginUrl, who, scope });
+  const html = buildInviteEmailHtml({ apiKey, loginUrl, who, scope });
 
   return sendMail({
     to,
-    subject: "Your roomd access link",
+    subject: "Your roomd access key",
     text,
     html,
     loginUrl,

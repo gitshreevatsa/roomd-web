@@ -37,7 +37,6 @@ import {
 import { emailTeamId } from "@/lib/teams";
 import { sendInviteEmail } from "@/lib/mail";
 import { buildInviteEmailHtml } from "@/lib/email/invite-template";
-import { createRedeemToken } from "@/lib/redeem";
 import { appendAudit } from "@/lib/audit";
 import { track, captureError } from "@/lib/telemetry";
 import type { OrgInviteEntry } from "@/types";
@@ -264,30 +263,25 @@ async function prepare(email: string, source: AccessSource, mk: string) {
       await upsertOrgInvite(entry);
     }
 
-    const redeem = await createRedeemToken({
-      secret: key.secret,
-      teamId: key.teamId,
-      email,
-    });
     const who = "You have been invited";
     const scope = "You get a team workspace and can create rooms.";
     const url = loginUrl();
     const html = buildInviteEmailHtml({
-      redeemUrl: redeem.redeemUrl,
+      apiKey: key.secret,
       loginUrl: url,
       who,
       scope,
     });
     const text =
       `${who} to roomd.\n\n` +
-      `Open this one-time link to reveal your access key:\n\n${redeem.redeemUrl}\n\n` +
-      `Then sign in at ${url}.\n\n${scope}`;
+      `${scope}\n\n` +
+      `Your API key (keep this email):\n${key.secret}\n\n` +
+      `Sign in at ${url} and paste the key.`;
 
     return NextResponse.json({
       email,
       source,
       secret: key.secret,
-      redeemUrl: redeem.redeemUrl,
       keyId: key.keyId,
       teamId: key.teamId,
       loginUrl: url,
@@ -331,14 +325,9 @@ async function confirm(
     let emailed = false;
     let reason: string | undefined;
     if (delivery === "email") {
-      const redeem = await createRedeemToken({
-        secret,
-        teamId: draft.teamId,
-        email,
-      });
       const mail = await sendInviteEmail({
         to: email,
-        redeemUrl: redeem.redeemUrl,
+        apiKey: secret,
         loginUrl: loginUrl(),
       });
       emailed = mail.sent;

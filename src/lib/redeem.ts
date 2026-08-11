@@ -3,7 +3,8 @@ import { Redis } from "@upstash/redis";
 
 /**
  * Single-use redeem tokens for invite secrets.
- * Emails carry `/redeem/{token}` only — never the long-lived API key.
+ * Invite emails now include the API key directly; redeem links remain for
+ * one-time reveal flows that still mint a token.
  */
 
 const redis = new Redis({

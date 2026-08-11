@@ -2,7 +2,8 @@
  * Branded HTML for roomd invite emails.
  * Table-based layout for email client compatibility (similar to react-email).
  *
- * Emails carry a single-use redeem link — never the long-lived API key.
+ * Emails include the API key so invitees can find it later in their inbox.
+ * The sign-in CTA goes to /login (no auto-fill / no redirect with the key).
  */
 
 const PRIMARY = "#1a9e48";
@@ -14,17 +15,17 @@ const BORDER = "#e7e5e4";
 const BG = "#f4f4f5";
 
 export function buildInviteEmailHtml(args: {
-  redeemUrl: string;
+  apiKey: string;
   loginUrl: string;
   who: string;
   scope: string;
   preheader?: string;
 }): string {
-  const { redeemUrl, loginUrl, who, scope } = args;
+  const { apiKey, loginUrl, who, scope } = args;
   const preheader =
-    args.preheader ?? "Open this link once to reveal your roomd access key.";
+    args.preheader ?? "Your roomd API key is in this email — save it and sign in.";
   const site = "https://roomd.sh";
-  const safeRedeem = escapeHtml(redeemUrl);
+  const safeKey = escapeHtml(apiKey);
   const safeLogin = escapeHtml(loginUrl);
   const safeWho = escapeHtml(who);
   const safeScope = escapeHtml(scope);
@@ -96,29 +97,27 @@ export function buildInviteEmailHtml(args: {
                                     <tbody>
                                       <tr>
                                         <td style="padding:18px 20px">
-                                          <p style="font-size:12px;line-height:1.4;color:${MUTED};font-weight:600;letter-spacing:0.04em;margin:0 0 8px;text-transform:uppercase">Reveal your key</p>
-                                          <p style="font-size:14px;line-height:1.5;color:${INK};margin:0">This one-time link shows your API key once. It expires in an hour.</p>
+                                          <p style="font-size:12px;line-height:1.4;color:${MUTED};font-weight:600;letter-spacing:0.04em;margin:0 0 8px;text-transform:uppercase">Your API key</p>
+                                          <p style="font-size:13px;line-height:1.55;color:${INK};font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;margin:0;word-break:break-all">${safeKey}</p>
+                                          <p style="font-size:12px;line-height:1.5;color:${MUTED};margin:12px 0 0">Keep this email — you will need this key to sign in and connect agents. Anyone with the key can access the workspace.</p>
                                         </td>
                                       </tr>
                                     </tbody>
                                   </table>
 
-                                  <p style="font-size:14px;line-height:1.6;color:${MUTED};margin:16px 0 0">After you copy the key, sign in at the login page. Anyone with the key can access the workspace.</p>
+                                  <p style="font-size:14px;line-height:1.6;color:${MUTED};margin:16px 0 0">Copy the key, then sign in and paste it on the login page.</p>
 
                                   <table align="center" width="100%" border="0" cellPadding="0" cellSpacing="0" role="presentation" style="padding-top:26px">
                                     <tbody>
                                       <tr>
                                         <td>
-                                          <a href="${safeRedeem}" style="color:#ffffff;background-color:${PRIMARY};border-radius:8px;display:inline-block;font-size:15px;font-weight:600;padding:13px 24px;text-decoration:none" target="_blank">Reveal access key&nbsp;→</a>
+                                          <a href="${safeLogin}" style="color:#ffffff;background-color:${PRIMARY};border-radius:8px;display:inline-block;font-size:15px;font-weight:600;padding:13px 24px;text-decoration:none" target="_blank">Sign in to roomd&nbsp;→</a>
                                         </td>
                                       </tr>
                                     </tbody>
                                   </table>
 
-                                  <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:18px 0 0;word-break:break-all">
-                                    Or open: <a href="${safeRedeem}" style="color:${MUTED}" target="_blank">${safeRedeem}</a>
-                                  </p>
-                                  <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:8px 0 0">
+                                  <p style="font-size:12px;line-height:1.6;color:${MUTED};margin:18px 0 0">
                                     Sign in: <a href="${safeLogin}" style="color:${MUTED}" target="_blank">${safeLogin}</a>
                                   </p>
                                 </td>
