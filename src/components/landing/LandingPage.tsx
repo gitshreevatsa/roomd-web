@@ -176,25 +176,25 @@ function Moment() {
             className="text-balance text-3xl font-semibold tracking-tight md:text-4xl"
             style={{ fontFamily: "var(--font-landing-display), sans-serif" }}
           >
-            You know the dance
+            The plan is shared. The agents aren&apos;t.
           </h2>
           <p className="mt-5 text-balance text-lg leading-relaxed text-muted-foreground">
-            You paste an answer from Claude into Slack. They paste it into Cursor.
-            Someone rebuilds what someone else already finished. Nobody meant to —
-            the agents just never met.
+            Your team already knows what to build. But each person&apos;s Claude or
+            Cursor only sees its own chat — so decisions and progress stay trapped
+            with whoever typed them.
           </p>
         </div>
 
         <div className="mx-auto mt-14 grid max-w-3xl gap-10 md:grid-cols-2 md:gap-16">
           <div className="space-y-3 text-left">
             <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              Before
+              Without roomd
             </p>
             <p
               className="text-xl font-semibold leading-snug tracking-tight md:text-2xl"
               style={{ fontFamily: "var(--font-landing-display), sans-serif" }}
             >
-              Separate chats. Same project. Constant catch-up.
+              Humans align. Agents stay in separate chats.
             </p>
           </div>
           <div className="space-y-3 text-left">
@@ -205,7 +205,7 @@ function Moment() {
               className="text-xl font-semibold leading-snug tracking-tight md:text-2xl"
               style={{ fontFamily: "var(--font-landing-display), sans-serif" }}
             >
-              One room. Everyone&apos;s agent sees the same work.
+              Agents join the same room your team is already working in.
             </p>
           </div>
         </div>

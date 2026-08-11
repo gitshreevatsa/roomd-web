@@ -519,19 +519,40 @@ export async function revokeRoomInvite(
 // Key validation (used during login)
 // ---------------------------------------------------------------------------
 
-export async function validateApiKey(
-  apiKey: string
-): Promise<{ valid: boolean; teamId?: string }> {
+export type ValidateApiKeyResult =
+  | { ok: true; teamId: string }
+  | {
+      ok: false;
+      reason:
+        | "invalid_key"
+        | "rate_limited"
+        | "api_unreachable"
+        | "api_misconfigured";
+    };
+
+/**
+ * Probe roomd `/admin/me` so login can distinguish bad keys from
+ * rate-limits / Redis outages / a missing ROOMD_URL.
+ */
+export async function validateApiKey(apiKey: string): Promise<ValidateApiKeyResult> {
+  const base = process.env.ROOMD_URL || ROOMD_URL;
+  if (!base) return { ok: false, reason: "api_misconfigured" };
+
   try {
-    const res = await fetch(`${ROOMD_URL}/admin/me`, {
+    const res = await fetch(`${base}/admin/me`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       cache: "no-store",
     });
-    if (!res.ok) return { valid: false };
-    const data = await res.json() as { teamId?: string };
-    return { valid: true, teamId: data.teamId };
+    if (res.status === 429) return { ok: false, reason: "rate_limited" };
+    if (res.status === 401 || res.status === 403) {
+      return { ok: false, reason: "invalid_key" };
+    }
+    if (!res.ok) return { ok: false, reason: "api_unreachable" };
+    const data = (await res.json()) as { teamId?: string };
+    if (!data.teamId) return { ok: false, reason: "invalid_key" };
+    return { ok: true, teamId: data.teamId };
   } catch {
-    return { valid: false };
+    return { ok: false, reason: "api_unreachable" };
   }
 }
 

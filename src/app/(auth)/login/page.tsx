@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DOCS_URL } from "@/lib/site";
 import { trackClient } from "@/lib/analytics-client";
+import { loginErrorMessage } from "@/lib/auth/login-errors";
 
 const AUTH_MODE = process.env.NEXT_PUBLIC_AUTH_MODE ?? "apikey";
 
@@ -32,8 +33,12 @@ export default function LoginPage() {
         redirect: false,
       });
       if (result?.error) {
-        trackClient("login_fail", { method: "apikey" });
-        setError("Invalid API key. Please try again.");
+        const code =
+          typeof (result as { code?: string }).code === "string"
+            ? (result as { code?: string }).code
+            : undefined;
+        trackClient("login_fail", { method: "apikey", code: code ?? result.error });
+        setError(loginErrorMessage(code));
         setLoading(false);
         return;
       }
