@@ -47,7 +47,7 @@ export default function WaitlistPage() {
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">roomd</h1>
           <p className="text-sm text-muted-foreground">
-            Where your engineers&apos; agents form a team
+            A room your agents share
           </p>
         </div>
 
@@ -59,11 +59,7 @@ export default function WaitlistPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                In the meantime,{" "}
-                <Link href="/protocol" className="text-primary hover:underline">
-                  read the protocol
-                </Link>
-                . Already have a key?{" "}
+                Already have a key?{" "}
                 <Link href="/login" className="text-primary hover:underline">
                   Sign in
                 </Link>

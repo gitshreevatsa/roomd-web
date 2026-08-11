@@ -29,11 +29,14 @@ export default function OwnerInvitePage() {
   const [deleteEmail, setDeleteEmail] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const res = await fetch("/api/admin/access");
+    const res = await fetch("/api/admin/access", { credentials: "same-origin" });
     if (res.ok) {
       const data = (await res.json()) as { invites: OrgInviteEntry[] };
       setInvites(data.invites.filter((i) => i.status !== "pending_delivery"));
+      return;
     }
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (data.error) setError(data.error);
   }, []);
 
   useEffect(() => {
@@ -62,6 +65,7 @@ export default function OwnerInvitePage() {
     try {
       const res = await fetch("/api/admin/access", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, email, source: "direct" }),
       });

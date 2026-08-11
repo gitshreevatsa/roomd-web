@@ -63,6 +63,7 @@ export function AcceptInviteDialog({
     try {
       const res = await fetch("/api/admin/access", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "confirm",
@@ -107,6 +108,7 @@ export function AcceptInviteDialog({
     try {
       await fetch("/api/admin/access", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "abandon", email: invite.email }),
       });
@@ -216,6 +218,7 @@ export async function prepareInvite(
 ): Promise<PreparedInvite> {
   const res = await fetch("/api/admin/access", {
     method: "POST",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "prepare", email, source }),
   });

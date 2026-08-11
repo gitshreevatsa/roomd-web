@@ -26,6 +26,9 @@ declare module "next-auth" {
 }
 
 export const authConfig = {
+  // Required on Vercel / multi-host so Auth.js trusts the request host when
+  // resolving the session cookie for Route Handlers.
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [], // real providers are added in auth.ts

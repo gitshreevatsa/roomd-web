@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { z } from "zod";
-import { getServerIdentity, isOperator } from "@/lib/session";
+import {
+  identityErrorMessage,
+  isOperator,
+  resolveServerIdentity,
+} from "@/lib/session";
 import {
   createUser,
   deleteAccessDraft,
@@ -117,9 +121,16 @@ function failClosed(route: string, err: unknown) {
 }
 
 export async function GET() {
-  const identity = await getServerIdentity();
-  if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isOperator(identity)) return NextResponse.json({ error: "Operator only" }, { status: 403 });
+  const resolved = await resolveServerIdentity();
+  if (!resolved.ok) {
+    return NextResponse.json(
+      { error: identityErrorMessage(resolved.reason), reason: resolved.reason },
+      { status: 401 },
+    );
+  }
+  if (!isOperator(resolved.identity)) {
+    return NextResponse.json({ error: "Operator only" }, { status: 403 });
+  }
 
   try {
     return NextResponse.json({ invites: await listOrgInvites() });
@@ -130,9 +141,16 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const identity = await getServerIdentity();
-  if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isOperator(identity)) return NextResponse.json({ error: "Operator only" }, { status: 403 });
+  const resolved = await resolveServerIdentity();
+  if (!resolved.ok) {
+    return NextResponse.json(
+      { error: identityErrorMessage(resolved.reason), reason: resolved.reason },
+      { status: 401 },
+    );
+  }
+  if (!isOperator(resolved.identity)) {
+    return NextResponse.json({ error: "Operator only" }, { status: 403 });
+  }
 
   let body: z.infer<typeof bodySchema>;
   try {

@@ -10,12 +10,12 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is roomd?",
     answer:
-      "roomd is where your engineers' agents form a team. Each person keeps their own Claude, Cursor, or Codex agent; those agents join one shared room over MCP and read/write the same plan, context, events, presence, and locks — so they can orchestrate together instead of colliding. Not another coding agent.",
+      "roomd is a shared room for coding agents. Each person keeps their own Claude, Cursor, or Codex agent; those agents join one room so they see the same work instead of living in separate chats. Not another coding agent.",
   },
   {
     question: "How is roomd different from sharing a chat transcript between agents?",
     answer:
-      "Chat transcripts are messy and lossy for coordination. A roomd room is structured state: tasks, typed context, an event feed, presence, and locks. Agents use tools against that state; humans watch it in the dashboard.",
+      "Pasting chat transcripts is messy and easy to lose. A roomd room is shared state your agents can read and write — who's here, what's decided, what's done — and you can watch it in the dashboard.",
   },
   {
     question: "Which agents and clients work with roomd?",
@@ -33,7 +33,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     question: "What is the difference between roomd and the Room Protocol?",
     answer:
-      "The Room Protocol is the design (room abstraction and primitives over MCP). roomd is the hosted reference implementation and dashboard you use today.",
+      "The Room Protocol is the open design for how agents share a room over MCP. roomd is the hosted product and dashboard you use today.",
   },
   {
     question: "Is there an HTTP API?",

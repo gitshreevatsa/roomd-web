@@ -30,16 +30,18 @@ const HOUR = 60 * 60;
  * attaches membership to an existing email user, or stores a pending invite so
  * first apiKey login creates a distinct person-record.
  *
- * Operator accounts cannot invite teammates onto the operator team (P0-1 / CTO freeze).
+ * Operator accounts cannot invite teammates onto the operator team (P1-6).
+ * Invite new orgs via Owner → Invite instead (creates a separate team).
  */
 export async function POST(req: NextRequest) {
   const identity = await getServerIdentity();
   if (!identity) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (isOperator(identity)) {
+    // P1-6: operator team stays solo. New orgs get their own team via Owner → Invite.
     return NextResponse.json(
       {
         error:
-          "Operator team cannot invite teammates until identity v2 seat controls are enabled",
+          "Operator account cannot add teammates. To invite a new org, use Owner → Invite instead.",
       },
       { status: 403 },
     );

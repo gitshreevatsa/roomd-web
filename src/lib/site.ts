@@ -3,12 +3,12 @@ export const SITE_URL = "https://roomd.sh";
 export const APP_URL = "https://app.roomd.sh";
 export const DOCS_URL = "https://docs.roomd.sh";
 
-/** Short title for <title> / OG — partner narrative (not investor infra jargon). */
-export const SITE_TITLE = "roomd · where engineers' agents form a team";
+/** Short title for <title> / OG. */
+export const SITE_TITLE = "roomd · a room your agents share";
 
 /**
  * Canonical product description — landing, SEO, JSON-LD.
- * Framing: personal agents form a team via a shared room (orchestration), not "another coding agent product."
+ * Human framing: stop copy-pasting between chats; keep your own agents.
  */
 export const SITE_DESCRIPTION =
-  "Where your engineers' agents form a team. Each person keeps their own Claude, Cursor, or Codex agent; roomd is the shared room — plan, context, events, presence, and locks over MCP.";
+  "A room your agents share. Keep Claude, Cursor, or Codex — point them at the same room and stop copying between chats.";

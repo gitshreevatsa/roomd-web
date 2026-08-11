@@ -17,6 +17,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { formatDate } from "@/lib/utils";
 import type { DynKey, InviteToken, RoomSummary } from "@/types";
 import type { WebhookRow } from "@/lib/roomd";
+import Link from "next/link";
 import { Plus, Trash2, Send } from "lucide-react";
 
 type PendingDelete =
@@ -45,6 +46,8 @@ export default function AdminPage() {
 
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [teammateEmail, setTeammateEmail] = useState("");
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [roomInviteError, setRoomInviteError] = useState<string | null>(null);
   const [keyNote, setKeyNote] = useState("");
   const [keyBoundAgentId, setKeyBoundAgentId] = useState("");
   const [createKeyOpen, setCreateKeyOpen] = useState(false);
@@ -135,18 +138,25 @@ export default function AdminPage() {
     const email = teammateEmail.trim();
     if (!email) return;
     setLoading(true);
+    setInviteError(null);
     try {
       const res = await fetch("/api/admin/keys/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+      const data = (await res.json().catch(() => ({}))) as InviteResult & {
+        error?: string;
+      };
       if (res.ok) {
-        const data = (await res.json()) as InviteResult;
         setInviteResult(data);
         setTeammateEmail("");
         fetchKeys();
+        return;
       }
+      setInviteError(data.error ?? "Could not invite teammate");
+    } catch {
+      setInviteError("Could not invite teammate");
     } finally {
       setLoading(false);
     }
@@ -204,6 +214,7 @@ export default function AdminPage() {
   async function createInvite() {
     if (!selectedRoom) return;
     setLoading(true);
+    setRoomInviteError(null);
     try {
       const expiresIn =
         inviteExpiry === "never"
@@ -219,11 +230,18 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(expiresIn !== undefined ? { expiresIn } : {}),
       });
-      if (res.ok) {
-        const data = await res.json() as { token: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        token?: string;
+        error?: string;
+      };
+      if (res.ok && data.token) {
         setNewInvite(data.token);
         fetchInvites(selectedRoom);
+        return;
       }
+      setRoomInviteError(data.error ?? "Could not create room invite");
+    } catch {
+      setRoomInviteError("Could not create room invite");
     } finally {
       setLoading(false);
     }
@@ -262,7 +280,10 @@ export default function AdminPage() {
                   type="email"
                   placeholder="teammate@company.com"
                   value={teammateEmail}
-                  onChange={(e) => setTeammateEmail(e.target.value)}
+                  onChange={(e) => {
+                    setTeammateEmail(e.target.value);
+                    if (inviteError) setInviteError(null);
+                  }}
                   className="h-9 w-full sm:w-56"
                 />
                 <Button
@@ -275,6 +296,16 @@ export default function AdminPage() {
                   Invite
                 </Button>
               </div>
+              {inviteError && (
+                <p className="max-w-sm text-right text-sm text-destructive">
+                  {inviteError}{" "}
+                  {inviteError.includes("Owner → Invite") && (
+                    <Link href="/owner" className="underline underline-offset-2">
+                      Open Owner
+                    </Link>
+                  )}
+                </p>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -487,6 +518,9 @@ export default function AdminPage() {
               </Button>
             </div>
           </div>
+          {roomInviteError && (
+            <p className="mt-2 text-sm text-destructive">{roomInviteError}</p>
+          )}
         </CardHeader>
         <CardContent>
           {!selectedRoom ? (

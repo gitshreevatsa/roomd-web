@@ -58,8 +58,10 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    // Everything except NextAuth handlers, Next internals, and static files
-    // (a path segment with a dot: whitepaper HTML/PDF, favicon, images).
-    "/((?!api/auth|_next/static|_next/image|.*\\..*).*)",
+    // Host split + session enrichment for pages only.
+    // Exclude ALL /api/* — Route Handlers call auth() themselves. Running the
+    // Auth.js middleware on API routes has caused null sessions (401 Unauthorized)
+    // on Owner invite while RSC pages still saw a valid session.
+    "/((?!api/|_next/static|_next/image|.*\\..*).*)",
   ],
 };

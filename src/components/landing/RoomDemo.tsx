@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 
-/** Animated hero visual: one room, three agents coordinating. */
+/** Animated hero visual: teammates' agents meeting in one room. */
 
-type Kind = "presence" | "context" | "read" | "blocked" | "done";
+type Kind = "join" | "share" | "read" | "wait" | "done";
 
 interface Beat {
   who: Who;
@@ -14,43 +14,35 @@ interface Beat {
 
 type Who = "alex" | "claire" | "jordan";
 
-const PEOPLE: { id: Who; role: string; tint: string }[] = [
-  { id: "alex", role: "backend", tint: "bg-violet-500" },
-  { id: "claire", role: "frontend", tint: "bg-sky-500" },
-  { id: "jordan", role: "qa", tint: "bg-amber-500" },
+const PEOPLE: { id: Who; label: string; tint: string }[] = [
+  { id: "alex", label: "Alex", tint: "bg-emerald-600" },
+  { id: "claire", label: "Claire", tint: "bg-teal-600" },
+  { id: "jordan", label: "Jordan", tint: "bg-lime-700" },
 ];
 
 const SCRIPT: Beat[] = [
-  { who: "alex", text: "joined the room", kind: "presence" },
-  { who: "alex", text: "wrote api_contract · auth", kind: "context" },
-  { who: "claire", text: "joined the room", kind: "presence" },
-  { who: "claire", text: "reading alex's contract", kind: "read" },
-  { who: "jordan", text: "blocked · needs /me endpoint", kind: "blocked" },
-  { who: "alex", text: "added /me → contract v1.1", kind: "context" },
-  { who: "claire", text: "login screen → done", kind: "done" },
+  { who: "alex", text: "joined the room", kind: "join" },
+  { who: "alex", text: "shared how login should work", kind: "share" },
+  { who: "claire", text: "joined the room", kind: "join" },
+  { who: "claire", text: "caught up on Alex's notes", kind: "read" },
+  { who: "jordan", text: "waiting — needs the /me route", kind: "wait" },
+  { who: "alex", text: "added /me to the notes", kind: "share" },
+  { who: "claire", text: "finished the login screen", kind: "done" },
 ];
 
 const KIND_ACCENT: Record<Kind, string> = {
-  presence: "bg-primary",
-  context: "bg-primary",
-  read: "bg-sky-500",
-  blocked: "bg-amber-500",
+  join: "bg-primary",
+  share: "bg-primary",
+  read: "bg-teal-500",
+  wait: "bg-amber-500",
   done: "bg-primary",
-};
-
-const KIND_LABEL: Record<Kind, string> = {
-  presence: "presence",
-  context: "context",
-  read: "event",
-  blocked: "event",
-  done: "task",
 };
 
 interface FeedItem extends Beat {
   id: number;
 }
 
-const TICK_MS = 2100;
+const TICK_MS = 2200;
 const DONE_BASE = 4;
 const TOTAL_TASKS = 8;
 
@@ -103,101 +95,89 @@ export function RoomDemo() {
   const pct = Math.round((doneCount / TOTAL_TASKS) * 100);
 
   return (
-    <div className="relative mx-auto w-full max-w-md">
+    <div className="relative mx-auto w-full">
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-8 -z-10 rounded-[2rem] opacity-80 blur-3xl"
+        className="pointer-events-none absolute -inset-10 -z-10 opacity-90 blur-3xl"
         style={{
           background:
-            "radial-gradient(20rem 14rem at 55% 20%, hsl(var(--primary) / 0.22), transparent 70%)",
+            "radial-gradient(22rem 16rem at 50% 30%, hsl(var(--primary) / 0.2), transparent 70%)",
         }}
       />
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xl shadow-black/[0.06] ring-1 ring-black/[0.03] dark:shadow-none dark:ring-white/[0.05]">
-        <div className="flex items-center justify-between border-b border-border/70 px-4 py-3.5">
-          <span className="inline-flex items-center gap-2.5">
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-md bg-primary">
-              <span className="h-1.5 w-1.5 rounded-[2px] bg-primary-foreground" />
-            </span>
-            <span className="font-mono text-xs font-medium">payments-api</span>
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary">
+
+      <div className="overflow-hidden rounded-2xl border border-border/80 bg-background/80 shadow-[0_24px_80px_-32px_rgba(0,0,0,0.35)] backdrop-blur-sm dark:bg-card/80">
+        <div className="flex items-center justify-between px-5 py-4">
+          <div className="text-left">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Live room
+            </p>
+            <p
+              className="mt-0.5 text-sm font-semibold tracking-tight"
+              style={{ fontFamily: "var(--font-landing-display), sans-serif" }}
+            >
+              payments-api
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary">
             <span className="roomd-live h-1.5 w-1.5 rounded-full bg-primary" />
-            live
+            online
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 border-b border-border/70 px-4 py-3.5">
+        <div className="flex flex-wrap items-center gap-2 border-y border-border/60 px-5 py-3">
           {PEOPLE.map((p) => {
             const isOn = online.has(p.id);
             return (
               <span
                 key={p.id}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] transition-all duration-500 ${
-                  isOn
-                    ? "border-border bg-background text-foreground shadow-sm"
-                    : "border-transparent bg-muted/60 text-muted-foreground"
+                className={`inline-flex items-center gap-1.5 px-1 py-0.5 text-xs transition-opacity duration-500 ${
+                  isOn ? "opacity-100" : "opacity-35"
                 }`}
-                title={`${p.id} · ${p.role}`}
               >
                 <span
-                  className={`inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-semibold text-white ${p.tint} ${
-                    isOn ? "opacity-100" : "opacity-40"
-                  }`}
+                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold text-white ${p.tint}`}
                 >
-                  {p.id[0].toUpperCase()}
+                  {p.label[0]}
                 </span>
-                <span className="font-mono">{p.id}</span>
-                <span
-                  className={`h-1.5 w-1.5 rounded-full transition-colors duration-500 ${
-                    isOn ? "bg-primary" : "bg-muted-foreground/30"
-                  }`}
-                />
+                <span className="font-medium">{p.label}</span>
               </span>
             );
           })}
         </div>
 
-        <div className="flex h-[180px] flex-col gap-2 overflow-hidden px-3 py-3">
+        <div className="flex h-[200px] flex-col gap-2.5 overflow-hidden px-4 py-4">
           {feed.length === 0 && (
-            <p className="px-1 py-8 text-center text-xs text-muted-foreground">
-              waiting for agents…
+            <p className="px-1 py-10 text-center text-sm text-muted-foreground">
+              Waiting for someone to join…
             </p>
           )}
           {feed.map((item) => {
             const person = PEOPLE.find((p) => p.id === item.who)!;
             return (
-              <div
-                key={item.id}
-                className="roomd-enter flex items-center gap-2.5 rounded-xl border border-border/60 bg-background px-3 py-2.5"
-              >
-                <span className={`h-7 w-0.5 shrink-0 rounded-full ${KIND_ACCENT[item.kind]}`} />
+              <div key={item.id} className="roomd-enter flex items-start gap-3 px-1 py-1.5">
+                <span className={`mt-1.5 h-6 w-0.5 shrink-0 rounded-full ${KIND_ACCENT[item.kind]}`} />
                 <span
-                  className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ${person.tint}`}
+                  className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white ${person.tint}`}
                 >
-                  {item.who[0].toUpperCase()}
+                  {person.label[0]}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs">
-                    <span className="font-mono font-medium text-foreground">{item.who}</span>{" "}
-                    <span className="text-muted-foreground">{item.text}</span>
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  {KIND_LABEL[item.kind]}
-                </span>
+                <p className="min-w-0 flex-1 text-left text-sm leading-snug">
+                  <span className="font-semibold text-foreground">{person.label}</span>{" "}
+                  <span className="text-muted-foreground">{item.text}</span>
+                </p>
               </div>
             );
           })}
         </div>
 
-        <div className="space-y-2 border-t border-border/70 px-4 py-3.5">
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span className="font-mono">plan</span>
+        <div className="space-y-2 px-5 pb-5 pt-1">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Shared progress</span>
             <span>
-              {doneCount} of {TOTAL_TASKS} done
+              {doneCount} of {TOTAL_TASKS}
             </span>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
             <div
               className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
               style={{ width: `${pct}%` }}

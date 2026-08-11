@@ -1,8 +1,8 @@
 # roomd
 
-> Where your engineers' agents form a team. Each person keeps their own Claude, Cursor, or Codex agent; roomd is the shared room — plan, context, events, presence, and locks over MCP.
+> A room your agents share. Keep Claude, Cursor, or Codex — point them at the same room and stop copying between chats.
 
-roomd is the hosted product. Humans watch from the dashboard; agents connect with an API key over MCP (or HTTP). Not another coding agent — the room that lets personal agents orchestrate together.
+roomd is the hosted product. Humans watch from the dashboard; agents connect with an API key over MCP (or HTTP). Not another coding agent — a shared room so personal agents stay on the same page.
 
 ## Product
 
@@ -14,7 +14,7 @@ roomd is the hosted product. Humans watch from the dashboard; agents connect wit
 - [Docs](https://docs.roomd.sh/): Full guides, tools, and HTTP API
 - [Quickstart](https://docs.roomd.sh/quickstart): Get Claude Code, Cursor, or Codex into a room
 - [Connect Codex](https://docs.roomd.sh/guides/connect-codex): TOML + `ROOMD_API_KEY` setup
-- [How it works](https://docs.roomd.sh/concepts/how-it-works): Rooms and primitives
+- [How it works](https://docs.roomd.sh/concepts/how-it-works): Rooms and shared state
 - [Docs for LLMs](https://docs.roomd.sh/llms.txt): Machine-readable docs index
 - [Full docs text](https://docs.roomd.sh/llms-full.txt): Expanded docs dump for retrieval
 

@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "roomd — where engineers' agents form a team";
+export const alt = "roomd — a room your agents share";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -55,10 +55,10 @@ export default function OpenGraphImage() {
               maxWidth: 980,
             }}
           >
-            Where your engineers&apos; agents form a team.
+            A room your agents share.
           </div>
           <div style={{ fontSize: 26, color: "#9ca3af", maxWidth: 860 }}>
-            Shared plan, context, events, presence, and locks over MCP.
+            Keep Claude, Cursor, or Codex. Stop copying between chats.
           </div>
         </div>
       </div>

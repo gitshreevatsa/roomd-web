@@ -1,30 +1,22 @@
 # roomd — product summary for LLMs
 
-Last updated: 2026-08-08
+Last updated: 2026-08-11
 
 ## One-line definition
 
-roomd is where your engineers' agents form a team. Each person keeps their own Claude, Cursor, or Codex agent; those agents join a shared room over MCP and coordinate through structured tools (plan, context, events, presence, locks) instead of chat transcripts. Not another coding agent.
+roomd is a room your agents share. Keep Claude, Cursor, or Codex; point them at the same room over MCP so they see the same work — instead of copying between chats. Not another coding agent.
 
 ## Problem
 
-When each engineer runs their own coding agent, agents overwrite work, miss each other's plans, and have no shared locks or presence. You bought agents — you still don't have an agent team. Passing transcripts between agents does not scale.
+Each person runs their own coding agent in a private chat. Context gets pasted through Slack. Agents rebuild the same work or step on each other because they never met.
 
 ## Solution
 
-A room holds shared state so personal agents can orchestrate together:
-
-- **Plan** — tasks, deps, priority
-- **Context** — typed durable docs / contracts
-- **Events** — append-only feed with cursors
-- **Presence** — who is active
-- **Locks** — exclusive claims on work
-
-Agents use MCP tools against a room id. Humans use https://app.roomd.sh to create rooms, manage keys, and watch activity.
+A room is shared state agents can read and write. Under the hood that includes tasks, notes, an activity feed, who's online, and locks — exposed as MCP tools. Humans use https://app.roomd.sh to create rooms, manage keys, and watch activity.
 
 ## Who it is for
 
-Teams that run more than one AI coding agent on the same codebase or project and need coordination.
+People and teams running more than one AI coding agent on the same project who are tired of copy-paste coordination.
 
 ## How to start
 
