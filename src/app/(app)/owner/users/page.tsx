@@ -67,8 +67,7 @@ export default function OwnerUsersPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Owner</h1>
         <p className="text-sm text-muted-foreground">
-          All dashboard users and orgs. Disable blocks access but keeps the row; Delete
-          removes them.
+          Everyone who has signed in. Disable turns off access; Delete removes them for good.
         </p>
       </div>
 
@@ -196,10 +195,10 @@ export default function OwnerUsersPage() {
         onOpenChange={(open) => {
           if (!open && !busy) setDeleteUser(null);
         }}
-        title="Delete this user?"
+        title="Delete this account?"
         description={
           deleteUser
-            ? `Delete ${deleteUser.label} permanently? Their API keys will be revoked and the account removed.`
+            ? `${deleteUser.label} will lose access and their account will be gone.`
             : ""
         }
         loading={!!deleteUser && busy === `${deleteUser.id}:delete`}

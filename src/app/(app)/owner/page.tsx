@@ -131,7 +131,7 @@ export default function OwnerInvitePage() {
         <CardHeader>
           <CardTitle>Sent invites</CardTitle>
           <CardDescription className="mt-1">
-            Orgs you invited. Disable pulls their key but keeps the row; Delete removes them.
+            People you invited. Disable turns off their access; Remove clears them from this list.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -200,7 +200,7 @@ export default function OwnerInvitePage() {
                             ) : (
                               <Trash2 className="h-3.5 w-3.5" />
                             )}
-                            Delete
+                            Remove
                           </Button>
                         </div>
                       </td>
@@ -224,12 +224,13 @@ export default function OwnerInvitePage() {
         onOpenChange={(open) => {
           if (!open && !revoking) setDeleteEmail(null);
         }}
-        title="Delete this invite?"
+        title="Remove this person?"
         description={
           deleteEmail
-            ? `Delete ${deleteEmail}? Their keys will be revoked and this invite row removed.`
+            ? `${deleteEmail} will lose access and won’t show up here anymore.`
             : ""
         }
+        confirmLabel="Remove"
         loading={!!deleteEmail && revoking === `${deleteEmail}:delete`}
         onConfirm={() => {
           if (deleteEmail) void act(deleteEmail, "delete");

@@ -188,8 +188,8 @@ export default function OwnerWaitlistPage() {
           <CardHeader>
             <CardTitle>History</CardTitle>
             <CardDescription className="mt-1">
-              Accepted, declined, and disabled waitlist requests. Disable keeps the row;
-              Delete removes it.
+              Accepted, declined, and disabled requests. Disable turns off access; Remove
+              clears them from this list.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -258,7 +258,7 @@ export default function OwnerWaitlistPage() {
                               ) : (
                                 <Trash2 className="h-3.5 w-3.5" />
                               )}
-                              Delete
+                              Remove
                             </Button>
                           )}
                         </div>
@@ -286,12 +286,13 @@ export default function OwnerWaitlistPage() {
         onOpenChange={(open) => {
           if (!open && !busyEmail) setDeleteEmail(null);
         }}
-        title="Delete from waitlist?"
+        title="Remove from waitlist?"
         description={
           deleteEmail
-            ? `Delete ${deleteEmail} from the waitlist? Keys will be revoked and the row removed.`
+            ? `${deleteEmail} will lose access if they had any, and they’ll leave this list.`
             : ""
         }
+        confirmLabel="Remove"
         loading={!!deleteEmail && busyEmail === `${deleteEmail}:delete`}
         onConfirm={() => {
           if (deleteEmail) void act(deleteEmail, "delete");

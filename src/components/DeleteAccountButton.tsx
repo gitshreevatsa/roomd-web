@@ -29,7 +29,7 @@ export function DeleteAccountButton({
           if (!pending) setOpen(next);
         }}
         title="Delete your account?"
-        description="This permanently removes your account. API keys will be revoked and you will be signed out."
+        description="This permanently deletes your account. You’ll lose access and be signed out."
         confirmLabel="Delete account"
         loading={pending}
         onConfirm={() => {

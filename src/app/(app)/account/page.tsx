@@ -46,8 +46,8 @@ export default async function AccountPage() {
           <div>
             <h2 className="text-sm font-medium text-destructive">Danger zone</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Permanently delete your account. API keys are revoked and you are
-              signed out. This cannot be undone.
+              Permanently delete your account. You’ll lose access and be signed out.
+              This cannot be undone.
             </p>
           </div>
           <DeleteAccountButton action={deleteAccountAction} />
