@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerIdentity } from "@/lib/session";
 import { updateTask, ROOM_ACCESS_DENIED } from "@/lib/roomd";
+import { captureError } from "@/lib/telemetry";
 import { z } from "zod";
 
 // status is required: roomd's update_task rejects a call without it.
@@ -33,7 +34,7 @@ export async function PATCH(
     if (err instanceof Error && err.message.includes(ROOM_ACCESS_DENIED)) {
       return NextResponse.json({ error: ROOM_ACCESS_DENIED }, { status: 403 });
     }
-    console.error("[task:update]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "task:update" });
     return NextResponse.json({ error: "Failed to update task" }, { status: 500 });
   }
 }

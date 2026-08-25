@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { consumeRedeemToken } from "@/lib/redeem";
+import { captureError } from "@/lib/telemetry";
 
 /**
  * GET /api/redeem/:token — return the API secret once, then delete the token.
@@ -25,7 +26,7 @@ export async function GET(
       warning: "copy now — this secret will not be shown again",
     });
   } catch (err) {
-    console.error("[redeem]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "redeem" });
     return NextResponse.json({ ok: false, error: "Redeem failed" }, { status: 500 });
   }
 }

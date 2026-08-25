@@ -11,6 +11,8 @@ import {
   listWaitlist,
 } from "@/lib/redis";
 import { purgeTeamRooms, revokeTeamAccess } from "@/lib/roomd";
+import { appendAudit } from "@/lib/audit";
+import { captureError } from "@/lib/telemetry";
 
 /**
  * Operator directory of dashboard users / orgs.
@@ -61,7 +63,7 @@ export async function GET() {
 
     return NextResponse.json({ users: rows });
   } catch (err) {
-    console.error("[users:list]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "users:list" });
     return NextResponse.json({ error: "Failed to load users" }, { status: 500 });
   }
 }
@@ -103,13 +105,21 @@ export async function POST(req: NextRequest) {
   try {
     if (body.action === "enable") {
       await enableUser(user.id);
+      await appendAudit({
+        actorUserId: identity.userId,
+        actorTeamId: identity.teamId,
+        action: "user.enable",
+        targetTeamId: user.teamId,
+        targetUserId: user.id,
+        targetEmail: user.email ?? undefined,
+      });
       return NextResponse.json({ ok: true, action: "enable" });
     }
 
     try {
       await revokeTeamAccess(user.teamId, master);
     } catch (err) {
-      console.error("[users:revoke]", err instanceof Error ? err.message : err);
+      captureError(err, { route: "users:revoke", targetUserId: user.id });
       return NextResponse.json(
         { ok: false, error: "Revocation incomplete — user not changed" },
         { status: 502 },
@@ -118,6 +128,15 @@ export async function POST(req: NextRequest) {
 
     if (body.action === "disable") {
       await disableUser(user.id);
+      await appendAudit({
+        actorUserId: identity.userId,
+        actorTeamId: identity.teamId,
+        action: "user.disable",
+        targetTeamId: user.teamId,
+        targetUserId: user.id,
+        targetEmail: user.email ?? undefined,
+        meta: { via: "users" },
+      });
       return NextResponse.json({ ok: true, action: "disable" });
     }
 
@@ -126,9 +145,9 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("not available")) {
-        console.error("[users:purge] TODO: purge endpoint unavailable", msg);
+        captureError(err, { route: "users:purge:unavailable", targetUserId: user.id });
       } else {
-        console.error("[users:purge]", msg);
+        captureError(err, { route: "users:purge", targetUserId: user.id });
         return NextResponse.json(
           { ok: false, error: "Room purge failed — user not deleted" },
           { status: 502 },
@@ -137,9 +156,18 @@ export async function POST(req: NextRequest) {
     }
 
     await deleteUser(user.id);
+    await appendAudit({
+      actorUserId: identity.userId,
+      actorTeamId: identity.teamId,
+      action: "user.delete",
+      targetTeamId: user.teamId,
+      targetUserId: user.id,
+      targetEmail: user.email ?? undefined,
+      meta: { via: "users" },
+    });
     return NextResponse.json({ ok: true, action: "delete" });
   } catch (err) {
-    console.error("[users:action]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "users:action", targetUserId: body.userId });
     return NextResponse.json({ error: "Action failed" }, { status: 500 });
   }
 }

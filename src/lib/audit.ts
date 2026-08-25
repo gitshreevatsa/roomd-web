@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { captureError } from "@/lib/telemetry";
 
 /**
  * Customer/operator-visible audit log for access-lifecycle events.
@@ -20,6 +21,8 @@ export type AuditAction =
   | "invites.revoke_team"
   | "keys.invite_teammate"
   | "access.prepare"
+  | "access.confirm"
+  | "access.abandon"
   | "access.redeem"
   | "membership.add"
   | "membership.remove"
@@ -46,25 +49,32 @@ function globalKey() {
   return `app:audit:global`;
 }
 
-export async function appendAudit(entry: Omit<AuditEntry, "id" | "at"> & { id?: string; at?: string }): Promise<AuditEntry> {
+export async function appendAudit(
+  entry: Omit<AuditEntry, "id" | "at"> & { id?: string; at?: string },
+): Promise<AuditEntry | null> {
   const full: AuditEntry = {
     ...entry,
     id: entry.id ?? `aud_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     at: entry.at ?? new Date().toISOString(),
   };
-  const payload = JSON.stringify(full);
-  const pipeline: Promise<unknown>[] = [redis.lpush(globalKey(), payload)];
-  if (full.targetTeamId) pipeline.push(redis.lpush(teamKey(full.targetTeamId), payload));
-  if (full.actorTeamId && full.actorTeamId !== full.targetTeamId) {
-    pipeline.push(redis.lpush(teamKey(full.actorTeamId), payload));
+  try {
+    const payload = JSON.stringify(full);
+    const pipeline: Promise<unknown>[] = [redis.lpush(globalKey(), payload)];
+    if (full.targetTeamId) pipeline.push(redis.lpush(teamKey(full.targetTeamId), payload));
+    if (full.actorTeamId && full.actorTeamId !== full.targetTeamId) {
+      pipeline.push(redis.lpush(teamKey(full.actorTeamId), payload));
+    }
+    await Promise.all(pipeline);
+    // Bound list growth (best-effort).
+    await Promise.all([
+      redis.ltrim(globalKey(), 0, AUDIT_MAX - 1),
+      full.targetTeamId ? redis.ltrim(teamKey(full.targetTeamId), 0, AUDIT_MAX - 1) : Promise.resolve(),
+    ]);
+    return full;
+  } catch (err) {
+    captureError(err, { route: "audit:append", action: full.action });
+    return null;
   }
-  await Promise.all(pipeline);
-  // Bound list growth (best-effort).
-  await Promise.all([
-    redis.ltrim(globalKey(), 0, AUDIT_MAX - 1),
-    full.targetTeamId ? redis.ltrim(teamKey(full.targetTeamId), 0, AUDIT_MAX - 1) : Promise.resolve(),
-  ]);
-  return full;
 }
 
 export async function listTeamAudit(teamId: string, limit = 100): Promise<AuditEntry[]> {

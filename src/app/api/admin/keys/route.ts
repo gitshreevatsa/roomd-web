@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerIdentity } from "@/lib/session";
 import { createAdminKey, listAdminKeys } from "@/lib/roomd";
+import { captureError } from "@/lib/telemetry";
 
 export async function POST(req: NextRequest) {
   const identity = await getServerIdentity();
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
     const key = await createAdminKey(identity.apiKey, note, boundAgentId);
     return NextResponse.json(key, { status: 201 });
   } catch (err) {
-    console.error("[keys:create]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "keys:create" });
     return NextResponse.json({ error: "Failed to create key" }, { status: 500 });
   }
 }
@@ -30,7 +31,7 @@ export async function GET() {
     const keys = await listAdminKeys(identity.apiKey);
     return NextResponse.json({ keys });
   } catch (err) {
-    console.error("[keys:list]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "keys:list" });
     return NextResponse.json({ error: "Failed to list keys" }, { status: 500 });
   }
 }

@@ -1,5 +1,9 @@
 import NextAuth from "next-auth";
-import { NextResponse } from "next/server";
+import {
+  NextResponse,
+  type NextFetchEvent,
+  type NextRequest,
+} from "next/server";
 import { authConfig } from "@/auth.config";
 
 // The middleware runs in the edge runtime, so it uses only the edge-safe config
@@ -24,14 +28,20 @@ function appOrigin(): string {
   return raw;
 }
 
+function ensureRequestId(req: NextRequest): string {
+  const incoming = req.headers.get("x-request-id")?.trim();
+  if (incoming && incoming.length > 0 && incoming.length <= 128) return incoming;
+  return crypto.randomUUID();
+}
+
 /**
- * Host split:
- *   roomd.sh     → marketing (landing, protocol, waitlist)
- *   app.roomd.sh → product (login, dashboard, rooms)
+ * Host split for pages + request-id for API.
  *
- * Localhost / *.vercel.app keep both surfaces on one host.
+ * Auth.js must NOT wrap /api/* — that caused null sessions (401) on Owner
+ * invite while RSC pages still saw a valid session.
  */
-export default auth((req) => {
+const pageMiddleware = auth((req) => {
+  const requestId = ensureRequestId(req);
   const host = req.headers.get("host")?.split(":")[0]?.toLowerCase() ?? "";
   const { pathname, search } = req.nextUrl;
 
@@ -39,7 +49,9 @@ export default auth((req) => {
   if (APP_HOSTS.has(host) && pathname === "/") {
     const url = req.nextUrl.clone();
     url.pathname = req.auth?.user ? "/dashboard" : "/login";
-    return NextResponse.redirect(url);
+    const res = NextResponse.redirect(url);
+    res.headers.set("x-request-id", requestId);
+    return res;
   }
 
   // roomd.sh — send product routes to the app host
@@ -49,19 +61,36 @@ export default auth((req) => {
       (p) => pathname === p || pathname.startsWith(`${p}/`),
     );
     if (isAppRoute) {
-      return NextResponse.redirect(new URL(`${pathname}${search}`, appOrigin()));
+      const res = NextResponse.redirect(new URL(`${pathname}${search}`, appOrigin()));
+      res.headers.set("x-request-id", requestId);
+      return res;
     }
   }
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  res.headers.set("x-request-id", requestId);
+  return res;
 });
+
+export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  if (req.nextUrl.pathname.startsWith("/api/")) {
+    const requestId = ensureRequestId(req);
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-request-id", requestId);
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("x-request-id", requestId);
+    return res;
+  }
+  // Auth.js types this as an App Router handler; at runtime it is middleware.
+  return (pageMiddleware as unknown as (
+    req: NextRequest,
+    event: NextFetchEvent,
+  ) => ReturnType<typeof pageMiddleware>)(req, event);
+}
 
 export const config = {
   matcher: [
-    // Host split + session enrichment for pages only.
-    // Exclude ALL /api/* — Route Handlers call auth() themselves. Running the
-    // Auth.js middleware on API routes has caused null sessions (401 Unauthorized)
-    // on Owner invite while RSC pages still saw a valid session.
-    "/((?!api/|_next/static|_next/image|.*\\..*).*)",
+    // Pages (host split + session) and API (request id only).
+    "/((?!_next/static|_next/image|.*\\..*).*)",
   ],
 };

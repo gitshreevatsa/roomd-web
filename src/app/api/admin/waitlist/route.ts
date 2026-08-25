@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServerIdentity, isOperator } from "@/lib/session";
 import { listWaitlist, markWaitlistDeclined } from "@/lib/redis";
+import { captureError } from "@/lib/telemetry";
 
 /**
  * Waitlist inbox only (landing-page requests).
@@ -21,7 +22,7 @@ export async function GET() {
   try {
     return NextResponse.json({ entries: await listWaitlist() });
   } catch (err) {
-    console.error("[waitlist:list]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "waitlist:list" });
     return NextResponse.json({ error: "Failed to load the waitlist" }, { status: 500 });
   }
 }
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     await markWaitlistDeclined(body.email.toLowerCase());
     return NextResponse.json({ email: body.email.toLowerCase(), status: "declined" });
   } catch (err) {
-    console.error("[waitlist:decline]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "waitlist:decline" });
     return NextResponse.json({ error: "Failed to decline" }, { status: 500 });
   }
 }

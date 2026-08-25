@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerIdentity } from "@/lib/session";
 import { revokeAdminKey } from "@/lib/roomd";
+import { captureError } from "@/lib/telemetry";
 
 export async function DELETE(
   _req: NextRequest,
@@ -14,7 +15,7 @@ export async function DELETE(
     await revokeAdminKey(params.keyId, identity.apiKey);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[keys:revoke]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "keys:revoke" });
     return NextResponse.json({ error: "Failed to revoke key" }, { status: 500 });
   }
 }

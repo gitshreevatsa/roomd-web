@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerIdentity } from "@/lib/session";
 import { createRoomInvite, listRoomInvites, revokeRoomInvite } from "@/lib/roomd";
+import { captureError } from "@/lib/telemetry";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -23,7 +24,7 @@ export async function POST(
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: err.issues }, { status: 400 });
     }
-    console.error("[invite:create]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "invite:create" });
     return NextResponse.json({ error: "Failed to create invite" }, { status: 500 });
   }
 }
@@ -39,7 +40,7 @@ export async function GET(
     const invites = await listRoomInvites(params.roomId, identity.apiKey);
     return NextResponse.json({ invites });
   } catch (err) {
-    console.error("[invite:list]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "invite:list" });
     return NextResponse.json({ error: "Failed to list invites" }, { status: 500 });
   }
 }
@@ -58,7 +59,7 @@ export async function DELETE(
     await revokeRoomInvite(tokenId, params.roomId, identity.apiKey);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[invite:revoke]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "invite:revoke" });
     return NextResponse.json({ error: "Failed to revoke invite" }, { status: 500 });
   }
 }

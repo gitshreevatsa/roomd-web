@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { Redis } from "@upstash/redis";
+import { logWarn } from "@/lib/telemetry";
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -9,7 +10,7 @@ const redis = new Redis({
 /**
  * Fixed-window rate limit (per bucket).
  * Default window is 60s; pass `windowSeconds` for hourly caps (e.g. invites).
- * Fails open if Redis is unreachable so auth stays available.
+ * Fails open if Redis is unreachable so auth stays available — but logs the outage.
  */
 export async function checkWebRateLimit(
   bucket: string,
@@ -24,7 +25,11 @@ export async function checkWebRateLimit(
     if (count === 1) await redis.expire(key, Math.max(windowSeconds * 2, 120));
     const remaining = Math.max(0, limit - count);
     return { allowed: count <= limit, remaining };
-  } catch {
+  } catch (err) {
+    logWarn("ratelimit.fail_open", {
+      bucket: bucket.slice(0, 64),
+      err: err instanceof Error ? err.message : String(err),
+    });
     return { allowed: true, remaining: limit };
   }
 }

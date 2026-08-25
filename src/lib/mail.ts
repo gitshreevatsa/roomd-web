@@ -1,6 +1,7 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { createHash, randomBytes } from "crypto";
 import { buildInviteEmailHtml } from "@/lib/email/invite-template";
+import { captureError } from "@/lib/telemetry";
 
 /**
  * Outbound email via SMTP (nodemailer).
@@ -106,7 +107,7 @@ export async function sendMail({ to, subject, text, html, loginUrl }: SendArgs):
     });
     return { sent: true };
   } catch (err) {
-    console.error("[mail]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "mail:send" });
     return { sent: false, reason: "send failed" };
   }
 }

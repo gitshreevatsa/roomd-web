@@ -11,6 +11,7 @@ const LINKS: { href: string; label: string; exact?: boolean }[] = [
   { href: "/owner/waitlist", label: "Waitlist" },
   { href: "/owner/users", label: "Users" },
   { href: "/owner/usage", label: "Usage" },
+  { href: "/owner/audit", label: "Activity" },
 ];
 
 export function OwnerNav() {

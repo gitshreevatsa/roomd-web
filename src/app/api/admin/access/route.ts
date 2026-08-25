@@ -110,8 +110,6 @@ function hashSecret(secret: string): string {
 }
 
 function failClosed(route: string, err: unknown) {
-  const message = err instanceof Error ? err.message : String(err);
-  console.error(`[${route}]`, message);
   captureError(err, { route });
   return NextResponse.json(
     { ok: false, error: "Revocation incomplete — access not changed" },
@@ -134,10 +132,12 @@ export async function GET() {
   try {
     return NextResponse.json({ invites: await listOrgInvites() });
   } catch (err) {
-    console.error("[access:list]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "access:list" });
     return NextResponse.json({ error: "Failed to load invites" }, { status: 500 });
   }
 }
+
+type Actor = { userId: string; teamId: string };
 
 export async function POST(req: NextRequest) {
   const resolved = await resolveServerIdentity();
@@ -167,22 +167,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const actor: Actor = {
+    userId: resolved.identity.userId,
+    teamId: resolved.identity.teamId,
+  };
+
   if (body.action === "prepare") {
-    return prepare(email, body.source, mk);
+    return prepare(email, body.source, mk, actor);
   }
   if (body.action === "confirm") {
-    return confirm(email, body.secret, body.delivery);
+    return confirm(email, body.secret, body.delivery, actor);
   }
   if (body.action === "abandon") {
-    return abandon(email, mk);
+    return abandon(email, mk, actor);
   }
   if (body.action === "delete") {
-    return deleteAccess(email, body.source, mk);
+    return deleteAccess(email, body.source, mk, actor);
   }
-  return disableAccess(email, body.source, mk);
+  return disableAccess(email, body.source, mk, actor);
 }
 
-async function prepare(email: string, source: AccessSource, mk: string) {
+async function prepare(email: string, source: AccessSource, mk: string, actor: Actor) {
   try {
     // Reuse teamId only from an in-flight draft. Never reuse a prior invited/
     // waitlist teamId after delete (P0-3) — that reopened purged tenant data.
@@ -211,7 +216,7 @@ async function prepare(email: string, source: AccessSource, mk: string) {
       try {
         await revokeAdminKey(existingDraft.keyId, mk);
       } catch (err) {
-        console.error("[access:prepare:revoke-draft]", err instanceof Error ? err.message : err);
+        captureError(err, { route: "access:prepare:revoke-draft" });
       }
       // Drop the unused person row from a previous unfinished prepare.
       if (existingUser && existingUser.teamId === existingDraft.teamId) {
@@ -278,6 +283,15 @@ async function prepare(email: string, source: AccessSource, mk: string) {
       `Your API key (keep this email):\n${key.secret}\n\n` +
       `Sign in at ${url} and paste the key.`;
 
+    await appendAudit({
+      actorUserId: actor.userId,
+      actorTeamId: actor.teamId,
+      action: "access.prepare",
+      targetTeamId: key.teamId,
+      targetEmail: email,
+      meta: { source, keyId: key.keyId },
+    });
+
     return NextResponse.json({
       email,
       source,
@@ -289,7 +303,7 @@ async function prepare(email: string, source: AccessSource, mk: string) {
       text,
     });
   } catch (err) {
-    console.error("[access:prepare]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "access:prepare" });
     return NextResponse.json({ error: "Failed to prepare invite" }, { status: 500 });
   }
 }
@@ -298,6 +312,7 @@ async function confirm(
   email: string,
   secret: string,
   delivery: "email" | "copy",
+  actor: Actor,
 ) {
   try {
     const draft = await getAccessDraft(email);
@@ -385,6 +400,15 @@ async function confirm(
       emailed,
       source: draft.source,
       teamId: draft.teamId,
+      userId: actor.userId,
+    });
+    await appendAudit({
+      actorUserId: actor.userId,
+      actorTeamId: actor.teamId,
+      action: "access.confirm",
+      targetTeamId: draft.teamId,
+      targetEmail: email,
+      meta: { delivery, emailed, source: draft.source },
     });
     return NextResponse.json({ email, emailed, delivery, confirmed: true });
   } catch (err) {
@@ -393,7 +417,7 @@ async function confirm(
   }
 }
 
-async function abandon(email: string, mk: string) {
+async function abandon(email: string, mk: string, actor: Actor) {
   try {
     const draft = await getAccessDraft(email);
     if (draft) {
@@ -402,7 +426,7 @@ async function abandon(email: string, mk: string) {
         try {
           await revokeAdminKey(draft.keyId, mk);
         } catch (err) {
-          console.error("[access:abandon:revoke]", err instanceof Error ? err.message : err);
+          captureError(err, { route: "access:abandon:revoke" });
         }
         // prepare() pre-creates the dashboard user — remove the unused person row.
         const user = await getUserByEmail(email);
@@ -418,15 +442,23 @@ async function abandon(email: string, mk: string) {
       await removeOrgInvitePending(email);
     }
 
+    await appendAudit({
+      actorUserId: actor.userId,
+      actorTeamId: actor.teamId,
+      action: "access.abandon",
+      targetTeamId: draft?.teamId,
+      targetEmail: email,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[access:abandon]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "access:abandon" });
     return NextResponse.json({ error: "Failed to cancel invite" }, { status: 500 });
   }
 }
 
 /** Disable = revoke keys + invites, keep the history row. Fail closed. */
-async function disableAccess(email: string, source: AccessSource, mk: string) {
+async function disableAccess(email: string, source: AccessSource, mk: string, actor: Actor) {
   try {
     const teamId = await resolveTeamId(email, source);
     // Identity v2: act on the person (email), not the legacy team-owner index alone.
@@ -465,8 +497,8 @@ async function disableAccess(email: string, source: AccessSource, mk: string) {
     else await markWaitlistRevoked(email);
 
     await appendAudit({
-      actorUserId: null,
-      actorTeamId: null,
+      actorUserId: actor.userId,
+      actorTeamId: actor.teamId,
       action: "user.disable",
       targetTeamId: teamId ?? undefined,
       targetUserId: user?.id,
@@ -476,13 +508,13 @@ async function disableAccess(email: string, source: AccessSource, mk: string) {
 
     return NextResponse.json({ ok: true, email, action: "disable" });
   } catch (err) {
-    console.error("[access:disable]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "access:disable" });
     return NextResponse.json({ error: "Failed to disable" }, { status: 500 });
   }
 }
 
 /** Delete = revoke keys/invites, purge rooms, remove row + linked user. Fail closed. */
-async function deleteAccess(email: string, source: AccessSource, mk: string) {
+async function deleteAccess(email: string, source: AccessSource, mk: string, actor: Actor) {
   try {
     const teamId = await resolveTeamId(email, source);
     // Identity v2: delete the specific person record for this email.
@@ -526,8 +558,8 @@ async function deleteAccess(email: string, source: AccessSource, mk: string) {
     else await removeFromWaitlist(email);
 
     await appendAudit({
-      actorUserId: null,
-      actorTeamId: null,
+      actorUserId: actor.userId,
+      actorTeamId: actor.teamId,
       action: "user.delete",
       targetTeamId: teamId ?? undefined,
       targetUserId: user?.id,
@@ -537,7 +569,7 @@ async function deleteAccess(email: string, source: AccessSource, mk: string) {
 
     return NextResponse.json({ ok: true, email, action: "delete" });
   } catch (err) {
-    console.error("[access:delete]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "access:delete" });
     return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerIdentity } from "@/lib/session";
 import { readPlan, listContext, readEvents, getPresence, ROOM_ACCESS_DENIED } from "@/lib/roomd";
+import { captureError } from "@/lib/telemetry";
 
 export async function GET(
   _req: NextRequest,
@@ -26,7 +27,7 @@ export async function GET(
     if (err instanceof Error && err.message.includes(ROOM_ACCESS_DENIED)) {
       return NextResponse.json({ error: ROOM_ACCESS_DENIED }, { status: 403 });
     }
-    console.error("[room data]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "room data" });
     return NextResponse.json({ error: "Failed to fetch room data" }, { status: 500 });
   }
 }

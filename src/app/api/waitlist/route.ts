@@ -6,7 +6,7 @@ import {
   getWaitlistEntry,
 } from "@/lib/redis";
 import { checkWebRateLimit, clientIp, rateLimitBucket } from "@/lib/ratelimit";
-import { track } from "@/lib/telemetry";
+import { track, captureError } from "@/lib/telemetry";
 import { z } from "zod";
 
 const schema = z.object({ email: z.string().trim().email().max(254) });
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     if (err instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid email" }, { status: 400 });
     }
-    console.error("[waitlist]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "waitlist" });
     return NextResponse.json({ error: "Could not join the waitlist" }, { status: 500 });
   }
 }

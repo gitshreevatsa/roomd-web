@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerIdentity } from "@/lib/session";
 import { createWebhook, listWebhooks } from "@/lib/roomd";
+import { captureError } from "@/lib/telemetry";
 
 /**
  * Lightweight client-side filter for obvious bad targets.
@@ -55,7 +56,7 @@ export async function GET() {
     const webhooks = await listWebhooks(identity.apiKey);
     return NextResponse.json({ webhooks });
   } catch (err) {
-    console.error("[webhooks:list]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "webhooks:list" });
     return NextResponse.json({ error: "Failed to list webhooks" }, { status: 500 });
   }
 }
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     const hook = await createWebhook(identity.apiKey, body.url, body.roomId);
     return NextResponse.json(hook, { status: 201 });
   } catch (err) {
-    console.error("[webhooks:create]", err instanceof Error ? err.message : err);
+    captureError(err, { route: "webhooks:create" });
     return NextResponse.json({ error: "Failed to create webhook" }, { status: 500 });
   }
 }

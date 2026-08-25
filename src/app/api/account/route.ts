@@ -68,7 +68,7 @@ export async function DELETE() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("not available")) {
-        console.error("[account:delete:purge] TODO: purge endpoint unavailable", msg);
+        captureError(err, { route: "account:delete:purge:unavailable", userId: user.id });
       } else {
         captureError(err, { route: "account:delete:purge", userId: user.id });
         return NextResponse.json(

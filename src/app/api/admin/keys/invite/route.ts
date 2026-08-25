@@ -14,6 +14,7 @@ import {
   upsertMembership,
 } from "@/lib/redis";
 import { track, captureError } from "@/lib/telemetry";
+import { appendAudit } from "@/lib/audit";
 
 const schema = z.object({ email: z.string().trim().email().max(254) });
 
@@ -118,6 +119,14 @@ export async function POST(req: NextRequest) {
       userId: identity.userId,
       teamId: identity.teamId,
       emailed: mail.sent,
+    });
+    await appendAudit({
+      actorUserId: identity.userId,
+      actorTeamId: identity.teamId,
+      action: "keys.invite_teammate",
+      targetTeamId: identity.teamId,
+      targetEmail: email,
+      meta: { emailed: mail.sent, keyId: key.keyId },
     });
 
     if (mail.sent) {
