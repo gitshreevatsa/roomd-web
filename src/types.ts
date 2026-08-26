@@ -78,8 +78,8 @@ export interface UserRecord {
    * live compare of apiKey === ROOMD_MASTER_KEY.
    */
   isOperator?: boolean;
-  /** Billing plan for hard caps / Stripe. */
-  plan?: "free" | "team" | "enterprise";
+  /** Billing plan for hard caps / Stripe. `team` is legacy alias for startup. */
+  plan?: "free" | "startup" | "team" | "enterprise";
   stripeCustomerId?: string;
   /** Hex-encoded TOTP secret when operator MFA is enrolled. */
   totpSecret?: string;

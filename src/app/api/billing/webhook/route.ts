@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { getUserByTeamId, updateUser } from "@/lib/redis";
 import { appendAudit } from "@/lib/audit";
 import { billingEnabled, planFromStripePriceId } from "@/lib/plans";
+import { normalizeTierId, setTeamTierConfig } from "@/lib/tiering";
 
 /**
  * Stripe webhook: updates team plan on subscription events.
@@ -68,17 +69,19 @@ export async function POST(req: NextRequest) {
     const user = teamId ? await getUserByTeamId(teamId) : null;
     // Fallback: find by stripeCustomerId would need an index; teamId metadata is required.
     if (user) {
+      const tier = normalizeTierId(plan);
       await updateUser(user.id, {
-        plan,
+        plan: tier,
         stripeCustomerId: customerId ?? user.stripeCustomerId,
       } as Parameters<typeof updateUser>[1]);
+      await setTeamTierConfig(user.teamId, { plan: tier });
       await appendAudit({
         actorUserId: null,
         actorTeamId: null,
         action: "billing.plan_change",
         targetTeamId: user.teamId,
         targetUserId: user.id,
-        meta: { plan, eventType: event.type },
+        meta: { plan: tier, eventType: event.type },
       });
     }
   }

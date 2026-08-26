@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getServerIdentity } from "@/lib/session";
-import { createRoom } from "@/lib/redis";
+import { createRoom, getUserById } from "@/lib/redis";
 import { getRoomSummaries } from "@/lib/rooms";
 import { claimRoom } from "@/lib/roomd";
 import { slugify } from "@/lib/utils";
 import { track, captureError } from "@/lib/telemetry";
+import {
+  TierLimitError,
+  assertCanCreateRoom,
+  effectiveTierForTeam,
+} from "@/lib/tiering";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
@@ -38,6 +43,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const user = await getUserById(identity.userId);
+    const tiers = await effectiveTierForTeam(identity.teamId, user?.plan);
+    await assertCanCreateRoom(identity.apiKey, tiers);
+
     let roomId = (requestedId ?? slugify(name)) || nanoid(8).toLowerCase();
 
     // Room ids are global in roomd, owned by whichever team touches them
@@ -48,7 +57,7 @@ export async function POST(req: NextRequest) {
       if (!(await claimRoom(roomId, identity.apiKey))) {
         return NextResponse.json(
           { error: "Could not allocate a room id. Try a different name." },
-          { status: 409 }
+          { status: 409 },
         );
       }
     }
@@ -60,14 +69,21 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     });
 
-    // Soft navigations can serve a stale RSC dashboard until refresh.
     revalidatePath("/dashboard");
     revalidatePath(`/rooms/${roomId}`);
     revalidatePath(`/rooms/${roomId}/setup`);
 
-    track("room_created", { userId: identity.userId, teamId: identity.teamId, roomId });
+    track("room_created", {
+      userId: identity.userId,
+      teamId: identity.teamId,
+      roomId,
+      plan: tiers.plan,
+    });
     return NextResponse.json({ roomId, name }, { status: 201 });
   } catch (err) {
+    if (err instanceof TierLimitError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 403 });
+    }
     captureError(err, { route: "rooms:create", userId: identity.userId });
     return NextResponse.json({ error: "Failed to create room" }, { status: 500 });
   }

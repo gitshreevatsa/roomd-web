@@ -4,16 +4,22 @@ import { getServerIdentity, isOperator } from "@/lib/session";
 import { createAdminKey, listAdminKeys } from "@/lib/roomd";
 import { sendInviteEmail } from "@/lib/mail";
 import { checkWebRateLimit, clientIp, rateLimitBucket } from "@/lib/ratelimit";
-import { limitsForPlan } from "@/lib/plans";
 import {
   getUserByEmail,
   getUserById,
-  listTeamMemberIds,
   savePendingTeammateInvite,
   updateUser,
   upsertMembership,
 } from "@/lib/redis";
 import { track, captureError } from "@/lib/telemetry";
+import {
+  TierLimitError,
+  assertCanAddMember,
+  assertCanCreateKey,
+  assertCanJoinOrg,
+  effectiveTierForTeam,
+  resolveEffectiveTier,
+} from "@/lib/tiering";
 import { appendAudit } from "@/lib/audit";
 
 const schema = z.object({ email: z.string().trim().email().max(254) });
@@ -65,26 +71,20 @@ export async function POST(req: NextRequest) {
 
   try {
     const user = await getUserById(identity.userId);
-    const limits = limitsForPlan(user?.plan);
-    const existingKeys = await listAdminKeys(identity.apiKey);
-    if (existingKeys.length >= limits.maxKeys) {
-      return NextResponse.json(
-        { error: `Team key limit reached (${limits.maxKeys})` },
-        { status: 403 },
-      );
-    }
+    const tiers = await effectiveTierForTeam(identity.teamId, user?.plan);
+    await assertCanAddMember(identity.teamId, tiers);
 
-    const memberIds = await listTeamMemberIds(identity.teamId);
-    if (memberIds.length >= limits.maxTeammates) {
-      return NextResponse.json(
-        { error: `Team seat limit reached (${limits.maxTeammates})` },
-        { status: 403 },
-      );
+    const existingKeys = await listAdminKeys(identity.apiKey);
+    await assertCanCreateKey(existingKeys.length, tiers);
+
+    const existing = await getUserByEmail(email);
+    if (existing && existing.teamId !== identity.teamId) {
+      // Cap how many orgs this human can belong to (their own plan).
+      await assertCanJoinOrg(existing.id, resolveEffectiveTier(existing.plan));
     }
 
     const key = await createAdminKey(identity.apiKey, `Teammate: ${email}`);
 
-    const existing = await getUserByEmail(email);
     if (existing) {
       // Attach membership; store their personal apiKey on THEIR user only.
       await upsertMembership({
@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
       userId: identity.userId,
       teamId: identity.teamId,
       emailed: mail.sent,
+      plan: tiers.plan,
     });
     await appendAudit({
       actorUserId: identity.userId,
@@ -126,7 +127,7 @@ export async function POST(req: NextRequest) {
       action: "keys.invite_teammate",
       targetTeamId: identity.teamId,
       targetEmail: email,
-      meta: { emailed: mail.sent, keyId: key.keyId },
+      meta: { emailed: mail.sent, keyId: key.keyId, plan: tiers.plan },
     });
 
     if (mail.sent) {
@@ -143,7 +144,11 @@ export async function POST(req: NextRequest) {
       warning: "copy now",
     });
   } catch (err) {
+    if (err instanceof TierLimitError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 403 });
+    }
     captureError(err, { route: "keys:invite", userId: identity.userId });
     return NextResponse.json({ error: "Failed to invite teammate" }, { status: 500 });
   }
 }
+
