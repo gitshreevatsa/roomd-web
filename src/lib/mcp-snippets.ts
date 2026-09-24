@@ -1,6 +1,9 @@
 /**
  * Ready-to-paste MCP client configs for the dashboard setup guide / landing.
  * Keep shapes in sync with roomd/docs/SETUP.md and roomd-docs/guides/connect-*.
+ *
+ * Paths: Claude Code → project `.mcp.json` (not `.claude/settings.json`);
+ * Cursor → `.cursor/mcp.json`; Codex → `~/.codex/config.toml` + env key.
  */
 
 export type McpSnippetClient = "claude" | "cursor" | "codex" | "other";

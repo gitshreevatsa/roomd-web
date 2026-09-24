@@ -432,9 +432,9 @@ Shown immediately after room creation. Also accessible from room header → "Set
 
 Three steps, full page or modal:
 
-**Step 1 — settings.json snippet**
+**Step 1 — `.mcp.json` snippet**
 ```
-Add this to your project's .claude/settings.json
+Add this to your project's .mcp.json (not .claude/settings.json)
 
 ┌──────────────────────────────────────────────────┐
 │ {                                                │

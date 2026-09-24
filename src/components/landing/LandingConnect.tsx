@@ -26,8 +26,8 @@ type ClientSnippet = {
 
 const SNIPPETS: Record<string, ClientSnippet> = {
   claude: {
-    path: ".claude/settings.json",
-    blocks: [{ label: "Paste into settings", text: buildClaudeSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
+    path: ".mcp.json",
+    blocks: [{ label: "Paste into .mcp.json", text: buildClaudeSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
   },
   cursor: {
     path: ".cursor/mcp.json",
