@@ -37,8 +37,8 @@ const CLIENTS: ClientGuide[] = [
   {
     id: "claude",
     label: "Claude Code",
-    configPath: ".claude/settings.json",
-    restartHint: "Restart Claude Code after saving.",
+    configPath: ".mcp.json",
+    restartHint: "Restart Claude Code after saving. Do not put mcpServers in .claude/settings.json — Claude ignores or rejects it there.",
     ruleHint: "Paste into CLAUDE.md in the project root (or merge with an existing roomd section).",
   },
   {
