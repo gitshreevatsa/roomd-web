@@ -26,6 +26,8 @@ interface ClientGuide {
   id: ClientId;
   label: string;
   configPath: string;
+  /** Where the file lives, shown next to configPath (e.g. project root). */
+  pathHint?: string;
   restartHint: string;
   ruleHint: string;
   /** Codex: key lives in env, not in the TOML snippet. */
@@ -38,6 +40,8 @@ const CLIENTS: ClientGuide[] = [
     id: "claude",
     label: "Claude Code",
     configPath: ".mcp.json",
+    /** Shown before the path so the file location is unambiguous. */
+    pathHint: "at the project root (same folder as package.json / .git — not inside .claude/)",
     restartHint: "Restart Claude Code after saving. Do not put mcpServers in .claude/settings.json — Claude ignores or rejects it there.",
     ruleHint: "Paste into CLAUDE.md in the project root (or merge with an existing roomd section).",
   },
@@ -45,6 +49,7 @@ const CLIENTS: ClientGuide[] = [
     id: "cursor",
     label: "Cursor",
     configPath: ".cursor/mcp.json",
+    pathHint: "at the project root (creates a .cursor/ folder next to package.json / .git)",
     restartHint: "Reload MCP in Cursor Settings → Tools & MCP, or restart Cursor.",
     ruleHint: "Paste into AGENTS.md in the project root (or a Cursor project rule).",
   },
@@ -115,11 +120,11 @@ export function SetupSnippet({ collabMcpUrl, apiKey, roomId }: SetupSnippetProps
                     </>
                   ) : (
                     <>
-                      Add this to{" "}
+                      Create or edit{" "}
                       <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
                         {c.configPath}
                       </code>
-                      . {c.restartHint}
+                      {c.pathHint ? <> {c.pathHint}</> : null}. {c.restartHint}
                     </>
                   )}
                 </p>
