@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,50 @@ interface ContextGridProps {
   entries: ContextEntry[];
   onRefresh: () => void;
   refreshing?: boolean;
+}
+
+/** Chat notes store prose in `payload.text` — show that, not a one-line JSON dump. */
+function hasProseText(payload: Record<string, unknown>): boolean {
+  return typeof payload.text === "string" && payload.text.trim().length > 0;
+}
+
+function formatMetaValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+function ContextPayloadView({ payload }: { payload: Record<string, unknown> }) {
+  if (hasProseText(payload)) {
+    const text = payload.text as string;
+    const meta = Object.entries(payload).filter(([key]) => key !== "text");
+
+    return (
+      <div className="space-y-3">
+        {meta.length > 0 && (
+          <div className="grid grid-cols-[minmax(5rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+            {meta.map(([key, value]) => (
+              <Fragment key={key}>
+                <div className="text-muted-foreground">{key}</div>
+                <div className="min-w-0 break-words">{formatMetaValue(value)}</div>
+              </Fragment>
+            ))}
+          </div>
+        )}
+        <div className="rounded-md bg-muted p-4 text-sm leading-relaxed text-foreground whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+          {text}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <pre className="max-h-none overflow-x-hidden overflow-y-visible whitespace-pre-wrap break-words rounded-md bg-muted p-4 font-mono text-xs leading-relaxed [overflow-wrap:anywhere]">
+      {JSON.stringify(payload, null, 2)}
+    </pre>
+  );
 }
 
 export function ContextGrid({ entries, onRefresh, refreshing }: ContextGridProps) {
@@ -104,23 +148,25 @@ export function ContextGrid({ entries, onRefresh, refreshing }: ContextGridProps
         </div>
       ))}
 
-      {/* Detail drawer */}
+      {/* Detail drawer — vertical scroll; wrap long payload text instead of horizontal scroll */}
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         {selected && (
-          <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-            <SheetHeader>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge variant={TYPE_BADGE[selected.type as ContextType]}>
-                  {TYPE_LABEL[selected.type as ContextType]}
-                </Badge>
-              </div>
-              <SheetTitle className="text-left">{selected.summary}</SheetTitle>
-            </SheetHeader>
+          <SheetContent className="flex h-full w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+            <div className="shrink-0 space-y-4 border-b px-6 pb-4 pt-6 pr-12">
+              <SheetHeader className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant={TYPE_BADGE[selected.type as ContextType]}>
+                    {TYPE_LABEL[selected.type as ContextType]}
+                  </Badge>
+                </div>
+                <SheetTitle className="text-left break-words [overflow-wrap:anywhere]">
+                  {selected.summary}
+                </SheetTitle>
+              </SheetHeader>
 
-            <div className="mt-4 space-y-4">
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-[minmax(6rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
                 <div className="text-muted-foreground">Author</div>
-                <div>{selected.author}</div>
+                <div className="min-w-0 break-words">{selected.author}</div>
                 <div className="text-muted-foreground">Timestamp</div>
                 <div>{formatRelativeTime(selected.timestamp)}</div>
                 <div className="text-muted-foreground">Version</div>
@@ -128,16 +174,20 @@ export function ContextGrid({ entries, onRefresh, refreshing }: ContextGridProps
                 {selected.consuming_agents.length > 0 && (
                   <>
                     <div className="text-muted-foreground">Consuming agents</div>
-                    <div>{selected.consuming_agents.join(", ")}</div>
+                    <div className="min-w-0 break-words">
+                      {selected.consuming_agents.join(", ")}
+                    </div>
                   </>
                 )}
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Payload</p>
-                <pre className="text-xs font-mono bg-muted p-4 rounded-md overflow-x-auto whitespace-pre">
-                  {JSON.stringify(selected.payload, null, 2)}
-                </pre>
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  {hasProseText(selected.payload) ? "Message" : "Payload"}
+                </p>
+                <ContextPayloadView payload={selected.payload} />
               </div>
             </div>
           </SheetContent>
