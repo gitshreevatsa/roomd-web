@@ -26,12 +26,13 @@ type ClientSnippet = {
 
 const SNIPPETS: Record<string, ClientSnippet> = {
   claude: {
-    path: ".mcp.json",
-    blocks: [{ label: "Paste into .mcp.json", text: buildClaudeSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
+    path: ".mcp.json (project root)",
+    hint: "Create .mcp.json in the project root — same folder as package.json / .git, not inside .claude/.",
+    blocks: [{ label: "Paste into project-root .mcp.json", text: buildClaudeSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
   },
   cursor: {
-    path: ".cursor/mcp.json",
-    blocks: [{ label: "Paste into mcp.json", text: buildCursorSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
+    path: ".cursor/mcp.json (project root)",
+    blocks: [{ label: "Paste into project-root .cursor/mcp.json", text: buildCursorSnippet(MCP_BASE, PLACEHOLDER_KEY) }],
   },
   codex: {
     path: "~/.codex/config.toml",
