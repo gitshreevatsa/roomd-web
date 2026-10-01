@@ -1,6 +1,7 @@
 /** Stable codes returned to the login UI via Auth.js `result.code`. */
 export type LoginErrorCode =
   | "invalid_key"
+  | "room_invite_key"
   | "rate_limited"
   | "too_many_attempts"
   | "api_unreachable"
@@ -11,6 +12,8 @@ export type LoginErrorCode =
 const MESSAGES: Record<LoginErrorCode, string> = {
   invalid_key:
     "Invalid API key. Use the secret only (not owner:…), and check for extra spaces.",
+  room_invite_key:
+    "That's a room invite token, not a dashboard key. It only works as a Bearer token in an MCP client. Sign in with your team key (ask whoever invited you).",
   rate_limited:
     "API is rate-limiting this key right now (or Redis is unavailable). Wait a minute and try again — or check Upstash / RATE_LIMIT_PER_MINUTE.",
   too_many_attempts:

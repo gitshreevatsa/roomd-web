@@ -525,6 +525,7 @@ export type ValidateApiKeyResult =
       ok: false;
       reason:
         | "invalid_key"
+        | "room_invite_key"
         | "rate_limited"
         | "api_unreachable"
         | "api_misconfigured";
@@ -544,7 +545,16 @@ export async function validateApiKey(apiKey: string): Promise<ValidateApiKeyResu
       cache: "no-store",
     });
     if (res.status === 429) return { ok: false, reason: "rate_limited" };
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 403) {
+      // A valid room invite token resolves, but is rejected at admin routes.
+      // Tell the user it's the wrong kind of key instead of "invalid".
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (body.error?.toLowerCase().includes("invite")) {
+        return { ok: false, reason: "room_invite_key" };
+      }
+      return { ok: false, reason: "invalid_key" };
+    }
+    if (res.status === 401) {
       return { ok: false, reason: "invalid_key" };
     }
     if (!res.ok) return { ok: false, reason: "api_unreachable" };

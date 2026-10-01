@@ -16,7 +16,11 @@ export const apikeyProvider = Credentials({
     apiKey: { label: "API Key", type: "password" },
   },
   async authorize(credentials) {
-    const apiKey = ((credentials?.apiKey as string) ?? "").trim();
+    // Strip ALL whitespace, not just the ends. Keys copied out of an invite
+    // email often pick up a line-break or space in the middle of the token
+    // (mail clients wrap long strings), which made a valid key 401 at roomd.
+    // No valid key format (bare nanoid, or teamId:secret) contains whitespace.
+    const apiKey = ((credentials?.apiKey as string) ?? "").replace(/\s+/g, "");
     if (!apiKey) throw new LoginCredentialsError("invalid_key");
 
     try {

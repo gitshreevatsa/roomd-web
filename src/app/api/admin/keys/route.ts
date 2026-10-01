@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerIdentity } from "@/lib/session";
+import { getServerIdentity, isOperator } from "@/lib/session";
 import { createAdminKey, listAdminKeys } from "@/lib/roomd";
 import { captureError } from "@/lib/telemetry";
 
@@ -29,7 +29,7 @@ export async function GET() {
 
   try {
     const keys = await listAdminKeys(identity.apiKey);
-    return NextResponse.json({ keys });
+    return NextResponse.json({ keys, operator: isOperator(identity) });
   } catch (err) {
     captureError(err, { route: "keys:list" });
     return NextResponse.json({ error: "Failed to list keys" }, { status: 500 });

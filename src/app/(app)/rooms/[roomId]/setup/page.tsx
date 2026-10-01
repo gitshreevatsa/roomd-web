@@ -38,8 +38,8 @@ export default async function SetupPage({ params, searchParams }: Props) {
           <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
             {params.roomId}
           </code>
-          . Connect an MCP client, paste AGENTS.md so the agent stays online and
-          logs every chat into room context, then open the room dashboard.
+          . Copy the snippet into your agent. The key in it is your team key —
+          the same one for every room you own. Only the room id changes.
         </p>
       </div>
 

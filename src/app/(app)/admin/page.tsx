@@ -17,8 +17,12 @@ import { CopyButton } from "@/components/CopyButton";
 import { formatDate } from "@/lib/utils";
 import type { DynKey, InviteToken, RoomSummary } from "@/types";
 import type { WebhookRow } from "@/lib/roomd";
-import Link from "next/link";
 import { Plus, Trash2, Send } from "lucide-react";
+import {
+  AcceptInviteDialog,
+  prepareInvite,
+  type PreparedInvite,
+} from "@/components/owner/AcceptInviteDialog";
 
 type PendingDelete =
   | { kind: "key"; id: string; label: string }
@@ -41,8 +45,11 @@ export default function AdminPage() {
   const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
 
   const [newKey, setNewKey] = useState<string | null>(null);
-  const [newInvite, setNewInvite] = useState<string | null>(null);
-  const [inviteExpiry, setInviteExpiry] = useState("never");
+  const [newInvite, setNewInvite] = useState<{ token: string; roomLabel: string } | null>(null);
+  const [inviteExpiry, setInviteExpiry] = useState("7d");
+  const [operator, setOperator] = useState(false);
+  const [roleReady, setRoleReady] = useState(false);
+  const [orgInvite, setOrgInvite] = useState<PreparedInvite | null>(null);
 
   const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
   const [teammateEmail, setTeammateEmail] = useState("");
@@ -59,9 +66,11 @@ export default function AdminPage() {
   async function fetchKeys() {
     const res = await fetch("/api/admin/keys");
     if (res.ok) {
-      const data = await res.json() as { keys: DynKey[] };
+      const data = await res.json() as { keys: DynKey[]; operator?: boolean };
       setKeys(data.keys);
+      setOperator(Boolean(data.operator));
     }
+    setRoleReady(true);
   }
 
   async function fetchWebhooks() {
@@ -140,6 +149,15 @@ export default function AdminPage() {
     setLoading(true);
     setInviteError(null);
     try {
+      if (operator) {
+        // Operator team stays solo. This invite creates a separate workspace
+        // and shows the key before anything is sent.
+        const prepared = await prepareInvite(email, "direct");
+        setOrgInvite(prepared);
+        setTeammateEmail("");
+        return;
+      }
+
       const res = await fetch("/api/admin/keys/invite", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -154,9 +172,9 @@ export default function AdminPage() {
         fetchKeys();
         return;
       }
-      setInviteError(data.error ?? "Could not invite teammate");
-    } catch {
-      setInviteError("Could not invite teammate");
+      setInviteError(data.error ?? "Could not invite");
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Could not invite");
     } finally {
       setLoading(false);
     }
@@ -216,26 +234,23 @@ export default function AdminPage() {
     setLoading(true);
     setRoomInviteError(null);
     try {
-      const expiresIn =
-        inviteExpiry === "never"
-          ? undefined
-          : inviteExpiry === "24h"
-          ? 86400
-          : inviteExpiry === "7d"
-          ? 604800
-          : undefined;
+      const expiresIn = inviteExpiry === "24h" ? 86400 : 604800;
 
       const res = await fetch(`/api/rooms/${selectedRoom}/invite`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(expiresIn !== undefined ? { expiresIn } : {}),
+        body: JSON.stringify({ expiresIn }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         token?: string;
         error?: string;
       };
       if (res.ok && data.token) {
-        setNewInvite(data.token);
+        const room = rooms.find((r) => r.roomId === selectedRoom);
+        setNewInvite({
+          token: data.token,
+          roomLabel: room?.name ?? selectedRoom,
+        });
         fetchInvites(selectedRoom);
         return;
       }
@@ -259,7 +274,9 @@ export default function AdminPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Invite teammates into your workspace, manage your keys, and share individual rooms.
+          {operator
+            ? "Invite someone into their own workspace, or share one room with an outside agent."
+            : "Invite a teammate into your rooms, or share one room with an outside agent."}
         </p>
       </div>
 
@@ -268,17 +285,18 @@ export default function AdminPage() {
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle>Teammates &amp; keys</CardTitle>
+              <CardTitle>{operator ? "Invite someone" : "Invite a teammate"}</CardTitle>
               <CardDescription className="mt-1">
-                A key signs someone in to your team and all its rooms. Invite a teammate by
-                email, or create a key to hand out yourself.
+                {operator
+                  ? "They get their own workspace. You will see their key here, then email it or copy it."
+                  : "They join your team and every room on it. You will see their key here once, and we email it too."}
               </CardDescription>
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
               <div className="flex gap-2">
                 <Input
                   type="email"
-                  placeholder="teammate@company.com"
+                  placeholder={operator ? "founder@company.com" : "teammate@company.com"}
                   value={teammateEmail}
                   onChange={(e) => {
                     setTeammateEmail(e.target.value);
@@ -289,7 +307,7 @@ export default function AdminPage() {
                 <Button
                   size="sm"
                   onClick={inviteTeammate}
-                  disabled={loading || !teammateEmail.trim()}
+                  disabled={loading || !roleReady || !teammateEmail.trim()}
                   className="gap-1.5 shrink-0"
                 >
                   <Send className="h-4 w-4" />
@@ -297,14 +315,7 @@ export default function AdminPage() {
                 </Button>
               </div>
               {inviteError && (
-                <p className="max-w-sm text-right text-sm text-destructive">
-                  {inviteError}{" "}
-                  {inviteError.includes("Owner → Invite") && (
-                    <Link href="/owner" className="underline underline-offset-2">
-                      Open Owner
-                    </Link>
-                  )}
-                </p>
+                <p className="max-w-sm text-right text-sm text-destructive">{inviteError}</p>
               )}
               <Button
                 variant="outline"
@@ -371,6 +382,9 @@ export default function AdminPage() {
               </table>
             </div>
           )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            This list only keeps the last 4 characters of each key. The full key is shown once, when you invite someone or create a key.
+          </p>
         </CardContent>
       </Card>
 
@@ -477,9 +491,9 @@ export default function AdminPage() {
         <CardHeader>
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <CardTitle>Room invites</CardTitle>
+              <CardTitle>Share one room</CardTitle>
               <CardDescription className="mt-1">
-                Room-scoped tokens let someone access one room only.
+                For an agent that should open only this room. Paste the token as the bearer in their MCP config. Your team key still opens every room.
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -502,7 +516,6 @@ export default function AdminPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="never">Never</SelectItem>
                   <SelectItem value="24h">24 hours</SelectItem>
                   <SelectItem value="7d">7 days</SelectItem>
                 </SelectContent>
@@ -660,20 +673,29 @@ export default function AdminPage() {
           <DialogHeader>
             <DialogTitle>Room invite created</DialogTitle>
             <DialogDescription>
-              Save this now. It won&apos;t be shown again.
+              Paste this as the Bearer token in their MCP client. It only opens {newInvite?.roomLabel}. This is the only time it is shown.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md border bg-muted p-4 font-mono text-sm break-all">
-            {newInvite}
+            {newInvite?.token}
           </div>
+          <p className="text-xs text-muted-foreground">
+            This is not a dashboard login. It only works as an MCP Bearer token. For dashboard
+            access, invite a teammate instead.
+          </p>
           <DialogFooter className="gap-2">
-            <CopyButton text={newInvite ?? ""} label="Copy token" />
+            <CopyButton text={newInvite?.token ?? ""} label="Copy token" />
             <Button variant="outline" onClick={() => setNewInvite(null)}>
               Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AcceptInviteDialog
+        invite={orgInvite}
+        onClose={() => setOrgInvite(null)}
+      />
 
       {/* Invite result modal: shown after inviting a teammate */}
       <Dialog open={!!inviteResult} onOpenChange={(o) => !o && setInviteResult(null)}>

@@ -130,8 +130,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (mail.sent) {
+      // The inviter just minted this key. Return it once so the dialog can
+      // show a copy. It is not stored in plaintext after this response.
       return NextResponse.json({
         email,
+        secret: key.secret,
         emailed: true,
       });
     }
