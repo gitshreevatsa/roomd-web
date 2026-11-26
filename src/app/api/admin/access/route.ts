@@ -39,6 +39,7 @@ import { sendInviteEmail } from "@/lib/mail";
 import { buildInviteEmailHtml } from "@/lib/email/invite-template";
 import { appendAudit } from "@/lib/audit";
 import { track, captureError } from "@/lib/telemetry";
+import { setTeamTierConfig } from "@/lib/tiering";
 import type { OrgInviteEntry } from "@/types";
 
 /**
@@ -245,6 +246,11 @@ async function prepare(email: string, source: AccessSource, mk: string, actor: A
         apiKey: key.secret,
         authMethods: ["apikey"],
         createdAt: draft.createdAt,
+        plan: "free",
+      });
+      await setTeamTierConfig(key.teamId, {
+        plan: "free",
+        updatedBy: actor.userId,
       });
     } catch (err) {
       if (err instanceof EmailTakenError) {
