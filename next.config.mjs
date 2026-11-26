@@ -2,10 +2,6 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Seed deck is a static reveal.js page in public/deck.
-  async rewrites() {
-    return [{ source: "/deck", destination: "/deck/index.html" }];
-  },
   async headers() {
     return [
       {
